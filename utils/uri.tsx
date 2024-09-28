@@ -1,0 +1,1 @@
+export const SERVER_URI=process.env.SERVER_URI||"http://192.168.29.115:8000/api/v1";
