@@ -18,16 +18,12 @@ const interests = [
   { id: 15, name: "Food" },
   { id: 13, name: "📕 Books" },
   { id: 16, name: "📖 Stories" },
-
   { id: 8, name: "🎬 Entertainment" },
   { id: 9, name: "💵 Business" },
-  { id:10, name: "🏭 Real Estate" },
-
+  { id: 10, name: "🏭 Real Estate" },
   { id: 12, name: "💻 Programming" },
-  
   { id: 14, name: "🌋 Geography" },
   { id: 17, name: "📷 Photography" },
-
   // Add more interests as needed
 ];
 
@@ -81,11 +77,14 @@ export default function WelcomeIntroScreen() {
   };
 
   return (
-    <LinearGradient
-    colors={["#A6121F", "#A6121F"]}      style={{ flex: 1, paddingHorizontal: 16 }}
-    >
+    <LinearGradient colors={["#A6121F", "#A6121F"]} style={{ flex: 1, paddingHorizontal: 16 }}>
       <ScrollView contentContainerStyle={{ paddingTop: 80 }}>
-        <Text style={[commonStyles.title, { fontFamily: "Raleway_700Bold", marginBottom: 20,color:"#fff" }]}>
+        <Text
+          style={[
+            commonStyles.title,
+            { fontFamily: "Raleway_700Bold", marginBottom: 20, color: "#fff" },
+          ]}
+        >
           Select Your Interests
         </Text>
         <View style={styles.interestsContainer}>{renderInterestButtons()}</View>
@@ -95,16 +94,24 @@ export default function WelcomeIntroScreen() {
         <TouchableOpacity
           style={[
             commonStyles.welcomeButtonStyle,
-            { backgroundColor: selectedInterests.length > 0 ? "#fff" : "#D98B91"},
+            { backgroundColor: selectedInterests.length >= 2 ? "#fff" : "#D98B91" },
           ]}
-          disabled={selectedInterests.length === 0}
+          disabled={selectedInterests.length < 2}
           onPress={() => {
-            if (selectedInterests.length > 0) {
+            if (selectedInterests.length >= 2) {
               router.push("/login");
             }
           }}
         >
-          <Text style={[styles.buttonText, { fontFamily: "Nunito_700Bold" ,color: selectedInterests.length > 0 ? "#A6121F" : "#fff" }]}>
+          <Text
+            style={[
+              styles.buttonText,
+              {
+                fontFamily: "Nunito_700Bold",
+                color: selectedInterests.length >= 2 ? "#A6121F" : "#fff",
+              },
+            ]}
+          >
             Continue
           </Text>
         </TouchableOpacity>
@@ -144,6 +151,6 @@ const styles = StyleSheet.create({
     color: "white",
     textAlign: "center",
     fontSize: 16,
-    paddingTop:4
+    paddingTop: 4,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, FlatList, StyleSheet, Dimensions, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import axios from 'axios';
@@ -8,7 +8,7 @@ import { WebView } from 'react-native-webview';
 const { width, height } = Dimensions.get('window');
 
 const extractVideoId = (url: string) => {
-  const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+  const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
   const match = url.match(regex);
   return match ? match[1] : null;
 };
@@ -16,28 +16,40 @@ const extractVideoId = (url: string) => {
 const NewsScreen = () => {
   const [newsItems, setNewsItems] = useState<NewsType[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [viewableItems, setViewableItems] = useState<number[]>([]);
   const flatListRef = useRef<FlatList<NewsType>>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingStates, setLoadingStates] = useState<boolean[]>([]); // Track loading states for each video
+  const [loading, setLoading] = useState<boolean>(true); // Initialize loading state
 
   useEffect(() => {
+    // Fetch only when the component is mounted
     axios
       .get(`${SERVER_URI}/news`)
       .then((res: any) => {
         setNewsItems(res.data.news);
+        setLoadingStates(new Array(res.data.news.length).fill(false)); // Initialize loading states
       })
       .catch((error) => {
         console.error('Error fetching news:', error);
       });
   }, []);
 
-  const onViewableItemsChanged = ({ viewableItems }: { viewableItems: any[] }) => {
+  // Viewable items changed callback
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
     if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index);
+      const visibleIndices = viewableItems.map((item) => item.index);
+      setCurrentIndex(visibleIndices[0]);
+      setViewableItems(visibleIndices); // Track which items are visible
     }
+  }, []);
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 20, // Video starts loading/playing when at least 20% visible
   };
 
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
     const videoId = item.reel_url ? extractVideoId(item.reel_url) : null;
+    const isItemVisible = viewableItems.includes(index); // Check if the item is visible
 
     const handlePress = () => {
       const simplifiedItem = {
@@ -51,23 +63,30 @@ const NewsScreen = () => {
       const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));
       router.push(`/course-details?item=${serializedItem}`);
     };
+    const videoUrlWithMute = item.reel_url ? `${item.reel_url}?autoplay=1&mute=1` : null;
+
+    // Change background color based on loading state
+    const backgroundColor = loadingStates[index] ? 'black' : 'black';
 
     return (
-      <View style={styles.container}>
-        {videoId ? (
-          <WebView
-            style={{ width: width, height: height }}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            source={{ uri: item.reel_url }}
-          />
+      <View style={[styles.container, { backgroundColor }]}>
+        {videoId && isItemVisible ? (
+         <WebView
+         style={{ width: width, height: height, backgroundColor: 'black' }} // Set background color to black
+         javaScriptEnabled={true}
+         domStorageEnabled={true}
+         source={{ uri: videoUrlWithMute || "" }} // Load the video only if visible
+         startInLoadingState={false} // Disable the default loader
+         onLoadStart={() => setLoading(true)} // Set loading to true when loading starts
+         onLoadEnd={() => setLoading(false)} // Set loading to false when loading ends
+         // Optionally handle onError
+       />
         ) : (
-          <Text style={styles.errorText}>Invalid video URL</Text>
+          <Text></Text> // Show placeholder when not visible
         )}
 
         {/* Overlay content (title and button) */}
         <View style={styles.overlay}>
-          {/* "Read More" Button in Top-Right Corner */}
           <TouchableOpacity style={styles.readMoreButton} onPress={handlePress}>
             <Text style={styles.readMoreText}>Read More</Text>
           </TouchableOpacity>
@@ -75,14 +94,6 @@ const NewsScreen = () => {
       </View>
     );
   };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#00ff00" />
-      </View>
-    );
-  }
 
   return (
     <FlatList
@@ -96,7 +107,7 @@ const NewsScreen = () => {
       decelerationRate="fast"
       snapToInterval={height} // Snap to the height of the screen
       onViewableItemsChanged={onViewableItemsChanged}
-      viewabilityConfig={{ itemVisiblePercentThreshold: 100 }} // Ensure full visibility of the item
+      viewabilityConfig={viewabilityConfig}
       getItemLayout={(data, index) => ({ length: height, offset: height * index, index })}
     />
   );
@@ -108,8 +119,7 @@ const styles = StyleSheet.create({
     height,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom:45,
-    paddingTop:30,
+    paddingBottom: 15,
   },
   overlay: {
     position: 'absolute',
@@ -134,12 +144,6 @@ const styles = StyleSheet.create({
   readMoreText: {
     color: 'white',
     fontSize: 14,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'black',
   },
   errorText: {
     color: 'red',

@@ -26,6 +26,7 @@ interface NewsType {
   featured_image?: string;
   // featured_video?: string;
   thumbnail?: string; // Thumbnail for the video
+  deleted?: boolean; // Add a flag for deleted news
 
   // comments: Comment[];
   createdAt:Date;

@@ -20,15 +20,16 @@ import { Redirect } from "expo-router";
 import Loader from "@/components/loader/loader";
 
 export default function TabsIndex() {
-  const { loading, user,isFirstVisit  } = useUser();
+  const { loading,user, isFirstVisit } = useUser();
+
+  if (loading || isFirstVisit == true) {
+    return <Loader />;
+  }
+console.log(isFirstVisit);
+  // Redirect based on whether it's the user's first visit
   return (
     <>
-      {loading ? (
-        <Loader />
-      ) : (
-        
-        <Redirect href={isFirstVisit ? "/(routes)/onboarding" : "/(tabs)"} />
-      )}
+      <Redirect href={isFirstVisit? "/(routes)/onboarding" : "/(tabs)"} />
     </>
   );
 }

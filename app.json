@@ -16,10 +16,15 @@
       "supportsTablet": true
     },
     "android": {
+      "permissions": ["INTERNET"],
+      "networkSecurityConfig": {
+        "domains": ["res.cloudinary.com"]
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.nidhi_06.client"
     },
     "web": {
       "bundler": "metro",
@@ -31,6 +36,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fa9e9b38-cde4-4940-89ab-c9edd245a850"
+      }
     }
   }
 }

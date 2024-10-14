@@ -20,44 +20,52 @@ import axios from "axios";
 import { SERVER_URI } from "@/utils/uri";
 import { router } from "expo-router";
 import CourseCard from "@/components/cards/course.card";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Define the type for the category
 interface CategoryType {
   _id: string;
   name: string;
 }
 
-
+// Define the type for newsByCategory
+interface NewsByCategoryType {
+  [key: string]: NewsType[]; // Maps category ID to an array of news items
+}
 
 interface AllCoursesProps {
   setSelectedCategory: (category: string) => void;
-  news: NewsType[];
 }
 
-const AllCourses = ({ news, setSelectedCategory }: AllCoursesProps) => {
-  const [categories, setCategories] = useState<CategoryType[]>([]);
-  const [newsByCategory, setNewsByCategory] = useState<{
-    [key: string]: NewsType[];
-  }>({});
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+const AllCourses = ({ setSelectedCategory }: AllCoursesProps) => {
   const [visibleCategories, setVisibleCategories] = useState<CategoryType[]>([]);
+  const [categories, setCategories] = useState<CategoryType[]>([]);
+  const [newsByCategory, setNewsByCategory] = useState<NewsByCategoryType>({});
+  const [loading, setLoading] = useState(true);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
+        // Clear old cache
+        await AsyncStorage.removeItem('categories');
+        // Optional: Clear all previous news data
+        const keys = await AsyncStorage.getAllKeys();
+        await AsyncStorage.multiRemove(keys);
+
+        // Fetch fresh categories
         const categoryResponse = await axios.get(`${SERVER_URI}/categories`, {
           withCredentials: true,
         });
         const categoriesData = categoryResponse.data.categories;
         setCategories(categoriesData);
+        setVisibleCategories([categoriesData[0]]); // Show the first category initially
 
-        // Load the first category's news initially
+        // Load news for the first category
         if (categoriesData.length > 0) {
-          setVisibleCategories([categoriesData[0]]);
           await loadNewsForCategory(categoriesData[0]._id);
         }
-
         setLoading(false);
       } catch (error) {
         console.error("Error fetching categories:", error);
@@ -70,12 +78,21 @@ const AllCourses = ({ news, setSelectedCategory }: AllCoursesProps) => {
 
   const loadNewsForCategory = async (categoryId: string) => {
     try {
+      // Fetch latest news from the server
       const newsResponse = await axios.get(
         `${SERVER_URI}/news/latest/${categoryId}`,
         { withCredentials: true }
       );
-      const newsData = newsResponse.data.latestNews.slice(0, 5);
-      setNewsByCategory((prev) => ({ ...prev, [categoryId]: newsData }));
+
+      // Filter out deleted items and update the cache
+      const newsData = newsResponse.data.latestNews.filter((news: NewsType) => !news.deleted);
+      setNewsByCategory((prev) => ({
+        ...prev,
+        [categoryId]: newsData,
+      }));
+
+      // Store the fresh news data in AsyncStorage
+      await AsyncStorage.setItem(`news_${categoryId}`, JSON.stringify(newsData));
     } catch (error) {
       console.error(`Error fetching news for category ${categoryId}:`, error);
     }
@@ -86,7 +103,10 @@ const AllCourses = ({ news, setSelectedCategory }: AllCoursesProps) => {
       const nextIndex = currentCategoryIndex + 1;
       const nextCategory = categories[nextIndex];
       setVisibleCategories((prev) => [...prev, nextCategory]);
-      loadNewsForCategory(nextCategory._id);
+      // Load news for the next category only if not already cached
+      if (!newsByCategory[nextCategory._id]) {
+        loadNewsForCategory(nextCategory._id);
+      }
       setCurrentCategoryIndex(nextIndex);
     }
   };
@@ -110,20 +130,13 @@ const AllCourses = ({ news, setSelectedCategory }: AllCoursesProps) => {
     );
   }
 
-  const handlePress = (item: any) => {
-    const simplifiedItem = {
-      id: item._id,
-      title: item.title,
-      content: item.content,
-      featured_video: item.featured_video,
-      yt_url: item.yt_url,
-    };
-    const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));
+  const handlePress = (item: NewsType) => {
+    const serializedItem = encodeURIComponent(JSON.stringify(item));
     router.push(`/course-details?item=${serializedItem}`);
   };
 
   return (
-    <View style={{ flex: 1, marginHorizontal: 16,marginTop:20 }}>
+    <View style={{ flex: 1, marginHorizontal: 16, marginTop: 20 }}>
       {visibleCategories.map((category) => (
         <View key={category._id} style={{ marginBottom: 16 }}>
           <View
@@ -148,7 +161,6 @@ const AllCourses = ({ news, setSelectedCategory }: AllCoursesProps) => {
                   <CourseCard item={item} />
                 </TouchableOpacity>
               )}
-             
             />
           ) : (
             <Text>No news available</Text>

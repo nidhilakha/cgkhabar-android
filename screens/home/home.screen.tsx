@@ -25,6 +25,7 @@ import CourseCard from "@/components/cards/course.card";
 import Loader from "@/components/loader/loader";
 import { SERVER_URI } from "@/utils/uri";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BannerDataTypes } from "@/components/home/home.banner.slider"; // Import the BannerDataTypes interface
 
 const AllCourses = React.lazy(() => import("@/components/courses/all.courses"));
 
@@ -38,6 +39,47 @@ const HomeScreen = () => {
   const [visibleNewsCount, setVisibleNewsCount] = useState(5); // Number of news items to display
   const [savedNewsIds, setSavedNewsIds] = useState<string[]>([]); // To track saved news IDs
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [bannerData, setBannerData] = useState<BannerDataTypes[]>([]); // Initialize with an empty array
+  const [error, setError] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    const getCachedBannerData = async () => {
+      try {
+        // Clear old cache on app start
+        await AsyncStorage.removeItem("bannerData");
+
+        // Fetch new banner data
+        await fetchBannerData();
+      } catch (error) {
+        setError("Error clearing cache or fetching banner data");
+        setLoading(false);
+      }
+    };
+
+    const fetchBannerData = async () => {
+      try {
+        const response = await axios.post(`${SERVER_URI}/news/banner`, {}, {
+          withCredentials: true,
+        });
+        const data = response.data;
+        const dataWithTimestamp = { ...data, timestamp: Date.now() }; // Add timestamp here
+        await AsyncStorage.setItem("bannerData", JSON.stringify(dataWithTimestamp));
+        setBannerData(data.news);
+      } catch (error) {
+        setError("Error fetching banner data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getCachedBannerData();
+  }, []);
+
+  
+
+  
+
 
   useEffect(() => {
     const fetchCategoriesAndNews = async () => {
@@ -298,6 +340,7 @@ const HomeScreen = () => {
       </View>
     );
   };
+  // console.log("Banner Data Passed to Slider:", bannerData);
 
   return (
     <LinearGradient colors={["#F2F2F2", "#e3e3e3"]} style={styles.container}>
@@ -317,10 +360,10 @@ const HomeScreen = () => {
           <ScrollView key={category._id} style={{ width }}>
             {activeCategory === "All" ? (
               <>
-                <HomeBannerSlider />
+                <HomeBannerSlider data={bannerData ?? []}  />
                 <Suspense fallback={<Loader />}>
                   <AllCourses
-                    news={news}
+                   
                     setSelectedCategory={setActiveCategory}
                   />
                 </Suspense>
