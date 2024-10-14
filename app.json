@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "client",
-    "slug": "client",
+   "name": "CG Khabar",
+    "slug": "cgkhabar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,19 +12,19 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
+   "ios": {
+      "bundleIdentifier": "com.cgkhabar.cgkhabarapp",
       "supportsTablet": true
     },
     "android": {
+  
       "permissions": ["INTERNET"],
-      "networkSecurityConfig": {
-        "domains": ["res.cloudinary.com"]
-      },
+   
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.nidhi_06.client"
+      "package": "com.cgkhabar.cgkhabarapp"
     },
     "web": {
       "bundler": "metro",
@@ -39,8 +39,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "fa9e9b38-cde4-4940-89ab-c9edd245a850"
+        "projectId": "e6707f4a-8bbe-4e1e-9881-34ec40581bf3"
       }
     }
   }
 }
+
