@@ -30,26 +30,41 @@ import DarkModePopup from '@/components/DarkModePopup';
 import Header from "@/components/header/header";
 
 export default function ProfileScreen() {
-  const { theme } = useTheme();
+
   const { user, loading, setUser, setRefetch } = useUser();
   const [image, setImage] = useState<any>(null);
   const [loader, setLoader] = useState(false);
+  const [theme, setTheme] = useState('light'); // State for theme
   const [popupVisible, setPopupVisible] = useState(false);
-  const containerStyle = theme === 'dark' ? styles.darkContainer : styles.lightContainer;
-  const [prevTheme, setPrevTheme] = useState(theme);
 
   useEffect(() => {
-    if (prevTheme !== theme) {
-      console.log("Current theme:", theme);
-      setPrevTheme(theme);
-    }
-  }, [theme]);
-  
+    const fetchTheme = async () => {
+      try {
+        const storedTheme = await AsyncStorage.getItem("theme");
+        console.log("Stored Theme:", storedTheme); // Log the stored theme
+        if (storedTheme) {
+          setTheme(storedTheme);
+        }
+      } catch (error) {
+        console.error("Error fetching theme:", error);
+      }
+    };
+
+    fetchTheme();
+  }, []);
 
   const toggleThemePopup = () => {
     setPopupVisible(!popupVisible);
   };
-  
+
+  const handleToggleTheme = async () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark'; // Toggle theme
+    await AsyncStorage.setItem("theme", newTheme); // Store new theme in AsyncStorage
+    console.log("Saving Theme:", newTheme); // Log the theme being saved
+
+    // Immediately update state with the new theme
+    setTheme(newTheme);
+  };
   let [fontsLoaded, fontError] = useFonts({
     Raleway_600SemiBold,
     Raleway_700Bold,
@@ -134,8 +149,10 @@ export default function ProfileScreen() {
       {loader || loading ? (
         <Loader />
       ) : (
-        <LinearGradient  colors={["#F2F2F2", "#e3e3e3"]} style={{ flex: 1,paddingTop: 50 }}>
-      <Header />
+        <LinearGradient
+        colors={theme === 'dark' ? ['#2d3a4e', '#1a1f29'] : ['#F2F2F2', '#e3e3e3']}
+        style={[{ flex: 1, paddingTop: 50 }]}>
+                <Header />
           <ScrollView  >
             <View style={{ flexDirection: "row", justifyContent: "center" }}>
               <View style={{ position: "relative" }}>
@@ -717,6 +734,7 @@ export default function ProfileScreen() {
           <DarkModePopup
             visible={popupVisible}
             onClose={toggleThemePopup}
+            onToggle={handleToggleTheme}
           />
         </LinearGradient>
       )}

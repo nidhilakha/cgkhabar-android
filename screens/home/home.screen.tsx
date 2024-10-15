@@ -26,6 +26,7 @@ import Loader from "@/components/loader/loader";
 import { SERVER_URI } from "@/utils/uri";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BannerDataTypes } from "@/components/home/home.banner.slider"; // Import the BannerDataTypes interface
+import { useTheme } from "@/utils/ThemeContext"; // Import your theme context
 
 const AllCourses = React.lazy(() => import("@/components/courses/all.courses"));
 
@@ -41,6 +42,26 @@ const HomeScreen = () => {
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [bannerData, setBannerData] = useState<BannerDataTypes[]>([]); // Initialize with an empty array
   const [error, setError] = useState<string | null>(null);
+
+  const [theme, setTheme] = useState('light'); // Default theme
+
+  useEffect(() => {
+    const fetchTheme = async () => {
+      try {
+        const storedTheme = await AsyncStorage.getItem("theme");
+        console.log("Stored Theme:", storedTheme); // Log the stored theme
+        if (storedTheme) {
+          setTheme(storedTheme);
+        }
+      } catch (error) {
+        console.error("Error fetching theme:", error);
+      }
+    };
+
+    fetchTheme();
+  }, []);
+
+  console.log("Stored Theme:", theme); // Log the stored theme
 
 
   useEffect(() => {
@@ -263,7 +284,7 @@ const HomeScreen = () => {
     };
 
     return (
-      <View>
+      <View >
         <FlatList
           data={displayedNews}
           keyExtractor={(item) => item._id}
@@ -343,7 +364,7 @@ const HomeScreen = () => {
   // console.log("Banner Data Passed to Slider:", bannerData);
 
   return (
-    <LinearGradient colors={["#F2F2F2", "#e3e3e3"]} style={styles.container}>
+    <LinearGradient colors={["#F2F2F2", "#e3e3e3"]}  style={theme === 'dark' ? styles.darkContainer : styles.lightContainer}>
       <Header />
       <CategoryHeader
         categories={categories}
@@ -379,6 +400,14 @@ const HomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  lightContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  darkContainer: {
+    flex: 1,
+    backgroundColor: '#2d3a4e',
+  },
   container: {
     flex: 1,
     paddingTop: 50,

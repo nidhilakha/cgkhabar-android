@@ -22,9 +22,9 @@ import Loader from "@/components/loader/loader";
 export default function TabsIndex() {
   const { loading,user, isFirstVisit } = useUser();
 
-  if (loading || isFirstVisit == true) {
-    return <Loader />;
-  }
+  // if (loading) {
+  //   return <Loader />;
+  // }
 console.log(isFirstVisit);
   // Redirect based on whether it's the user's first visit
   return (

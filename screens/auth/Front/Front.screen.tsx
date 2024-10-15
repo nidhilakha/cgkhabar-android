@@ -36,7 +36,7 @@ export default function FrontScreen() {
     // Redirect to login after 3 seconds
     const timeout = setTimeout(() => {
       router.push("/(tabs)");
-    }, 5000);
+    }, 3000);
 
     // Clean up the timeout on unmount
     return () => clearTimeout(timeout);

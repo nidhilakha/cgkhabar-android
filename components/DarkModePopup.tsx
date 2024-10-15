@@ -1,18 +1,15 @@
-// DarkModePopup.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
-import { useTheme } from '@/utils/ThemeContext';
 
 interface DarkModePopupProps {
   visible: boolean;
   onClose: () => void;
+  onToggle: (mode: 'light' | 'dark') => void; // Add this line
 }
 
-const DarkModePopup: React.FC<DarkModePopupProps> = ({ visible, onClose }) => {
-  const { setTheme } = useTheme();
-
-  const toggleTheme = (mode: 'light' | 'dark') => {
-    setTheme(mode);
+const DarkModePopup: React.FC<DarkModePopupProps> = ({ visible, onClose, onToggle }) => {
+  const handleToggleTheme = (mode: 'light' | 'dark') => {
+    onToggle(mode); // Call the onToggle function passed from the parent
     onClose();
   };
 
@@ -28,13 +25,13 @@ const DarkModePopup: React.FC<DarkModePopupProps> = ({ visible, onClose }) => {
           <Text style={styles.title}>Select Theme</Text>
           <TouchableOpacity
             style={styles.button}
-            onPress={() => toggleTheme('light')}
+            onPress={() => handleToggleTheme('light')}
           >
             <Text style={styles.buttonText}>Light Mode</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.button}
-            onPress={() => toggleTheme('dark')}
+            onPress={() => handleToggleTheme('dark')}
           >
             <Text style={styles.buttonText}>Dark Mode</Text>
           </TouchableOpacity>
