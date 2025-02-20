@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -13,80 +13,52 @@ import { AntDesign } from "@expo/vector-icons";
 import axios from "axios";
 import { SERVER_URI } from "@/utils/uri";
 import { router } from "expo-router";
-import CourseCard from "../cards/course.card";
 import { widthPercentageToDP } from "react-native-responsive-screen";
+import NewsCard from "../cards/news.cards";
 
 const SearchInput: React.FC<{ homeScreen?: boolean }> = ({ homeScreen }) => {
   const [value, setValue] = useState("");
   const [news, setNews] = useState<NewsType[]>([]);
   const [filteredNews, setFilteredNews] = useState<NewsType[]>([]);
-  const [currentPage, setCurrentPage] = useState(1); // To track page for lazy loading
-  const [loading, setLoading] = useState(false); // To show loading indicator
+  const [loading, setLoading] = useState(false);
 
-  const pageSize = 2; // Number of news items to fetch at a time
-  
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
   });
 
-  // Fetch initial data and load more as needed
-  const fetchNews = async (page: number) => {
+  // Fetch all news data
+  const fetchNews = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${SERVER_URI}/news`, {
-        params: { page, limit: pageSize },
-      });
-      const newNews = response.data.news;
-
-      setNews((prevNews) => [...prevNews, ...newNews]); // Append new data
+      const response = await axios.get(`${SERVER_URI}/news`);
+      const fetchedNews = response.data.news;
+      setNews(fetchedNews);
       if (!homeScreen) {
-        setFilteredNews((prevNews) => [...prevNews, ...newNews]);
+        setFilteredNews(fetchedNews);
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchNews(currentPage); // Load first page of data on mount
-  }, [homeScreen]);
+    fetchNews(); // Load all news data on mount
+  }, []);
 
   useEffect(() => {
     if (homeScreen && value === "") {
-      setFilteredNews([]);
+      setFilteredNews([]); // Clear filtered news on home screen if search is empty
     } else if (value) {
       const filtered = news.filter((item) =>
         item.title.toLowerCase().includes(value.toLowerCase())
       );
       setFilteredNews(filtered);
     } else if (!homeScreen) {
-      setFilteredNews(news);
+      setFilteredNews(news); // Show all news if search is empty
     }
   }, [value, news, homeScreen]);
-
-  const loadMoreNews = () => {
-    setCurrentPage((prevPage) => prevPage + 1);
-    fetchNews(currentPage + 1);
-  };
-
-  const renderCourseItem = useCallback(
-    ({ item }: { item: NewsType }) => (
-      <TouchableOpacity
-        style={styles.itemContainer}
-        onPress={() =>
-          router.push({
-            pathname: "/(routes)/course-details",
-            params: { item: JSON.stringify(item) },
-          })
-        }
-      >
-        <Text style={styles.itemText}>{item.title}</Text>
-      </TouchableOpacity>
-    ),
-    []
-  );
 
   if (!fontsLoaded) {
     return null;
@@ -113,25 +85,35 @@ const SearchInput: React.FC<{ homeScreen?: boolean }> = ({ homeScreen }) => {
       </View>
 
       <View style={styles.listContainer}>
-        <FlatList
-          data={filteredNews}
-          keyExtractor={(item) => item._id}
-          renderItem={homeScreen ? renderCourseItem : ({ item }) => <CourseCard item={item} />}
-        />
-        {!homeScreen && filteredNews.length === 0 && (
-          <Text style={styles.noDataText}>Loading...</Text>
-        )}
-        {loading && (
+        {loading ? (
           <ActivityIndicator size="small" color="#2467EC" />
+        ) : (
+          <FlatList
+            data={filteredNews}
+            keyExtractor={(item) => item._id}
+            initialNumToRender={5}
+            maxToRenderPerBatch={10}
+            renderItem={homeScreen ? 
+              ({ item }) => (
+                <TouchableOpacity
+                  style={styles.itemContainer}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(routes)/course-details",
+                      params: { item: JSON.stringify(item) },
+                    })
+                  }
+                >
+                  <Text style={styles.itemText}>{item.title}</Text>
+                </TouchableOpacity>
+              ) : ({ item }) => <NewsCard item={item} />
+            }
+          />
+        )}
+        {!homeScreen && filteredNews.length === 0 && !loading && (
+          <Text style={styles.noDataText}>No data found</Text>
         )}
       </View>
-
-      {/* Load More Button */}
-      {/* {!loading && filteredNews.length > 0 && (
-        <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreNews}>
-          <Text style={styles.loadMoreText}>Load More</Text>
-        </TouchableOpacity>
-      )} */}
     </View>
   );
 };
@@ -139,7 +121,7 @@ const SearchInput: React.FC<{ homeScreen?: boolean }> = ({ homeScreen }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginBottom:70
+    marginBottom: 70,
   },
   filteringContainer: {
     flexDirection: "row",
@@ -154,7 +136,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 5,
     paddingHorizontal: 10,
-    marginBottom:10
+    marginBottom: 10,
   },
   searchIconContainer: {
     width: 36,
@@ -192,18 +174,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     fontSize: 20,
     fontWeight: "600",
-  },
-  loadMoreButton: {
-    backgroundColor: "#2467EC",
-    padding: 10,
-    margin: 10,
-    borderRadius: 5,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadMoreText: {
-    color: "#fff",
-    fontWeight: "bold",
   },
 });
 

@@ -1,1 +1,1 @@
-export const SERVER_URI=process.env.SERVER_URI||"https://cgkhabar-842c8ecc5687.herokuapp.com/api/v1";
+export const SERVER_URI=process.env.SERVER_URI||"https://cg-khabar-ff8cc2c6285a.herokuapp.com/api/v1/";

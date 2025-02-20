@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -18,9 +18,12 @@ import {
 } from "@expo-google-fonts/nunito";
 import axios from "axios";
 import { SERVER_URI } from "@/utils/uri";
-import { router } from "expo-router";
-import CourseCard from "@/components/cards/course.card";
+import { router, useFocusEffect } from "expo-router";
+// import CourseCard from "@/components/cards/course.card";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ScrollView } from "react-native-gesture-handler";
+import NewsCard from "@/components/cards/news.cards";
 
 // Define the type for the category
 interface CategoryType {
@@ -35,15 +38,69 @@ interface NewsByCategoryType {
 
 interface AllCoursesProps {
   setSelectedCategory: (category: string) => void;
+  refresh: boolean; // Accept `refresh` as a prop
+
 }
 
-const AllCourses = ({ setSelectedCategory }: AllCoursesProps) => {
+const AllCourses = ({ setSelectedCategory,refresh }: AllCoursesProps) => {
   const [visibleCategories, setVisibleCategories] = useState<CategoryType[]>([]);
   const [categories, setCategories] = useState<CategoryType[]>([]);
   const [newsByCategory, setNewsByCategory] = useState<NewsByCategoryType>({});
   const [loading, setLoading] = useState(true);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [largeFontSize, setLargeFontSize] = useState('default'); // State for theme
+  const [isNavigating, setIsNavigating] = useState(false); // New state to track navigation
+
+  const [latestNews, setLatestNews] = useState<NewsType[]>([]); // New state for latest news
+  const [page, setPage] = useState(1);
+  // const [loadingMore, setLoadingMore] = useState(false);
+  const pageSize = 3; // Number of items to fetch per page
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchFont = async () => {
+        try {
+          const storedFont = await AsyncStorage.getItem("largeFontSize");
+          // console.log("Stored Font:", storedFont); // Log the stored theme
+          if (storedFont) {
+            setLargeFontSize(storedFont);
+          }
+        } catch (error) {
+          console.error("Error fetching theme:", error);
+        }
+      };
+  
+      fetchFont();
+    }, [])
+  );
+
+  useEffect(() => {
+    const fetchAllNews = async () => {
+      try {
+        const categoryResponse = await axios.get(`${SERVER_URI}/featured-news`, {
+          withCredentials: true,
+        });
+
+        const data = categoryResponse.data;
+        
+        if (data.success) {
+          // Fetch only the first 10 news items
+          const topNews = data.news.slice(0, 10); 
+          setLatestNews(topNews); // Set the latest news in the state
+        } else {
+          console.error("Failed to fetch news");
+        }
+        
+      } catch (error) {
+        console.error("Error fetching news", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllNews();
+  }, [refresh]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -51,8 +108,8 @@ const AllCourses = ({ setSelectedCategory }: AllCoursesProps) => {
         // Clear old cache
         await AsyncStorage.removeItem('categories');
         // Optional: Clear all previous news data
-        const keys = await AsyncStorage.getAllKeys();
-        await AsyncStorage.multiRemove(keys);
+        // const keys = await AsyncStorage.getAllKeys();
+        // await AsyncStorage.multiRemove(keys);
 
         // Fetch fresh categories
         const categoryResponse = await axios.get(`${SERVER_URI}/categories`, {
@@ -74,7 +131,7 @@ const AllCourses = ({ setSelectedCategory }: AllCoursesProps) => {
     };
 
     fetchCategories();
-  }, []);
+  }, [refresh]);
 
   const loadNewsForCategory = async (categoryId: string) => {
     try {
@@ -130,58 +187,75 @@ const AllCourses = ({ setSelectedCategory }: AllCoursesProps) => {
     );
   }
 
-  const handlePress = (item: NewsType) => {
-    const serializedItem = encodeURIComponent(JSON.stringify(item));
-    router.push(`/course-details?item=${serializedItem}`);
+  const stopLoadingData = () => {
+    setLoadingMore(false);
   };
-
   return (
-    <View style={{ flex: 1, marginHorizontal: 16, marginTop: 20 }}>
-      {visibleCategories.map((category) => (
-        <View key={category._id} style={{ marginBottom: 16 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 10,
+    <View style={{ flex: 1}}>
+       <View style={{ marginBottom: 20 }}>
+       <FlatList
+  data={latestNews}
+  keyExtractor={(item) => item._id}
+  renderItem={({ item }) => <NewsCard item={item} />}
+  initialNumToRender={3}
+  maxToRenderPerBatch={3}
+  windowSize={10}
+  removeClippedSubviews={true} // Improve performance on large lists
+/>
+
+       
+      </View>
+
+      {visibleCategories.map((category) =>
+  newsByCategory[category._id] && ( // Check if there is news for the category
+    <View key={category._id} style={{ marginBottom: 16 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 10,
+        }}
+      >
+        <Text style={[styles.cattext, { fontSize: largeFontSize === 'large' ? 24 : 20 }]}>{category.name}</Text>
+        <TouchableOpacity onPress={() => setSelectedCategory(category._id)}>
+          <Text style={[styles.viewallbtn, { fontSize: largeFontSize === 'large' ? 19 : 15 }]}>View All</Text>
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={newsByCategory[category._id]}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() => {
+              stopLoadingData(); // Stop loading more categories on card press
             }}
           >
-            <Text style={styles.cattext}>{category.name}</Text>
-            <TouchableOpacity onPress={() => setSelectedCategory(category._id)}>
-              <Text style={styles.viewallbtn}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          {newsByCategory[category._id]?.length > 0 ? (
-            <FlatList
-              data={newsByCategory[category._id]}
-              keyExtractor={(item) => item._id}
-              renderItem={({ item }) => (
-                <TouchableOpacity onPress={() => handlePress(item)}>
-                  <CourseCard item={item} />
-                </TouchableOpacity>
-              )}
-            />
-          ) : (
-            <Text>No news available</Text>
-          )}
-        </View>
-      ))}
+            <NewsCard item={item} />
+          </TouchableOpacity>
+        )}
+        onEndReached={loadMoreCategories}
+        onEndReachedThreshold={0.9}
+      />
+    </View>
+  )
+)}
 
-      {loadingMore && (
+      {/* {loadingMore && (
         <View style={{ justifyContent: "center", alignItems: "center" }}>
           <ActivityIndicator size="small" color="#2467EC" />
         </View>
-      )}
+      )} */}
 
-      {currentCategoryIndex + 1 < categories.length && (
+      {/* {currentCategoryIndex + 1 < categories.length && (
         <TouchableOpacity
           onPress={loadMoreCategories}
           style={styles.loadMoreButton}
         >
           <Text style={styles.loadMoreText}>Load More</Text>
         </TouchableOpacity>
-      )}
+      )} */}
     </View>
   );
 };

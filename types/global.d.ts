@@ -20,6 +20,9 @@ type Avatar = {
     courses: any;
     createdAt: Date;
     updatedAt: Date;
+    avatar?: Avatar;
+    profile_picture?: Avatar;
+
   };
   
   type BannerDataTypes = {

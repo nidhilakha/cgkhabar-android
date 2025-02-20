@@ -1,131 +1,86 @@
-import { StyleSheet } from "react-native";
-import { responsiveWidth } from "react-native-responsive-dimensions";
-import {
-  widthPercentageToDP as wp,
-  heightPercentageToDP as hp,
-} from "react-native-responsive-screen";
+import { Dimensions, StyleSheet } from "react-native";
+import { heightPercentageToDP as hp } from "react-native-responsive-screen";
+
+const { width, height } = Dimensions.get("window");
 
 export const styles = StyleSheet.create({
   container: {
     marginTop: 5,
-    height: hp("55"),
- 
-  },
+    height: hp("40%"), 
+  
+    borderRadius: 50,
 
-  slide: { 
-    flex: 1 ,
-    
   },
-
-  background: {
-    width: "100%",
-    height: hp("27"),
-    resizeMode: "stretch",
-    zIndex: 1,
-  },
-  title: {
-    marginTop: 5,
-    marginBottom: 10,
-    fontFamily: "Raleway_700Bold",
-    fontSize: 18,
-    color: "#333",
-    textAlign: "center",
-    height: 80,
-    backgroundColor: "#fff",
-    
-    padding: 10,
+  slide: {
+    flex: 1,
   },
   imageContainer: {
     position: "relative",
     width: "100%",
-    height: 300,
-   
+    aspectRatio: 16 / 13,
+    borderRadius: 10,
+    overflow: "hidden",
   },
   image: {
     width: "100%",
-    height: 300,
-
+    height: "100%",
+    resizeMode: "cover",
   },
-  button: {
+  gradientOverlay: {
     position: "absolute",
-    right: 10,
-    bottom: 20,
-    backgroundColor: "#BF0000",
-    paddingHorizontal: 16,
-    borderRadius: 4,
-    paddingVertical: 5,
-    
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 10,
   },
-  buttonText: {
-    color: "#fff",
-    fontFamily: "Nunito_700Bold",
-    fontSize: 14,
-  },
-
-  dot: {
-    backgroundColor: "#C6C7CC",
-    width: 10,
-    height: 10,
-    borderRadius: 5,
   
-         
-
+  overlay: {
+    position: "absolute", 
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)", 
+    borderRadius: 10, 
   },
-
+  
+  overlayTitle: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+    color: "#fff",
+    fontFamily: "Raleway_700Bold",
+    textAlign: "center",
+    paddingHorizontal: 10,
+  },
+  overlayTitleDark: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    right: 10,
+    color: "#fff",
+    fontFamily: "Raleway_700Bold",
+    textAlign: "left",
+    paddingHorizontal: 10,
+  },
+  dot: {
+    width: 8, // Smaller width for the dots
+    height: 8, // Smaller height for the dots
+    borderRadius: 4, // Adjust radius for smaller dots
+    backgroundColor: "#C6C7CC",
+    marginHorizontal: 2, // Reduced horizontal margin between dots
+    marginVertical:10
+  },
   activeDot: {
     backgroundColor: "#BF0000",
-    width: 10,
+    width: 10, // Adjusted size for active dot
     height: 10,
     borderRadius: 5,
-  
-    
-  },
-
-  backgroundView: {
-    position: "absolute",
-    zIndex: 5,
-    paddingHorizontal: 18,
-    paddingVertical: 30,
-    flexDirection: "row",
-    alignItems: "center",
-   
-  },
-
-  backgroundViewContainer: {
-    width: responsiveWidth(45),
-    height: responsiveWidth(30),
-    marginTop: -50,
-  },
-
-  backgroundViewText: {
-    color: "white",
-    fontSize: hp("2.7%"),
-  },
-
-  backgroundViewOffer: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 14,
-    marginTop: 5,
-  },
-
-  backgroundViewImage: {
-    width: wp("38%"),
-    height: hp("22%"),
-    top: -15,
-  },
-
-  backgroundViewButtonContainer: {
-    borderWidth: 1.1,
-    borderColor: "rgba(255, 255, 255, 0.5)",
-    width: 109,
-    height: 32,
-    borderRadius: 5,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 25,
-  },
-
-  backgroundViewButtonText: {
-    color: "#FFFF",
+    marginHorizontal: 2, // Match the margin of `dot`
   },
 });
+
+

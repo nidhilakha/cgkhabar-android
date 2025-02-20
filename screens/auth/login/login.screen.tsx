@@ -94,16 +94,16 @@ export default function LoginScreen() {
         if (refreshToken) {
           await AsyncStorage.setItem("refresh_token", refreshToken);
         } else {
-          console.log('No refresh token provided in response.');
+          // console.log('No refresh token provided in response.');
           await AsyncStorage.removeItem("refresh_token");
         }
 
-        router.push("/front");
+        router.push("/");
       } else {
         throw new Error("Access token is missing in the response");
       }
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       Toast.show("Email or password is not correct!", {
         type: "danger",
       });
@@ -208,6 +208,7 @@ export default function LoginScreen() {
             Forgot Password?
           </Text>
         </TouchableOpacity>
+        
 
         <TouchableOpacity
           onPress={handleSignIn}
@@ -283,7 +284,7 @@ export default function LoginScreen() {
         style={{alignItems: 'center', marginTop: 10, }}
         onPress={() => {
           console.log("Skip button pressed, navigating to tabs screen...");
-          router.push("/front");
+          router.push("/");
         }}
       >
         <Text style={{ color: "#fff", fontWeight:"600", textDecorationLine: 'underline', fontSize: 22, fontFamily: "Nunito_600SemiBold" }}>

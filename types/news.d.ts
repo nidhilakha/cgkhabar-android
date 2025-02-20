@@ -31,7 +31,10 @@ interface NewsType {
   // comments: Comment[];
   createdAt:Date;
   category:CategoryType;
+  
   banner:Number;
+  priority:Number;
+
   yt_url:string;
   author:string;
 }

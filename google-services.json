@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "771443512046",
+    "project_id": "cgkhabar-7fc19",
+    "storage_bucket": "cgkhabar-7fc19.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771443512046:android:c7cfd62ec19128a4e9d9ff",
+        "android_client_info": {
+          "package_name": "com.cgkhabar.cgkhabarapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXf6XJBox_8eqwLF1jV9dvqydBUBI8FQ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -21,14 +21,14 @@ export default function FrontScreen() {
     // Start fade-in animation for logo
     Animated.timing(fadeAnimLogo, {
       toValue: 1, // Fully visible
-      duration: 1000, // Animation duration for logo
+      duration: 500, // Animation duration for logo
       useNativeDriver: true, // Enable native driver for performance
     }).start();
 
     // Start fade-in animation for text
     Animated.timing(fadeAnimText, {
       toValue: 1, // Fully visible
-      duration: 1500, // Animation duration for text
+      duration: 1000, // Animation duration for text
       delay: 1000, // Delay before the text appears
       useNativeDriver: true,
     }).start();
@@ -36,7 +36,7 @@ export default function FrontScreen() {
     // Redirect to login after 3 seconds
     const timeout = setTimeout(() => {
       router.push("/(tabs)");
-    }, 3000);
+    }, 2000);
 
     // Clean up the timeout on unmount
     return () => clearTimeout(timeout);

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, FlatList, StyleSheet, Dimensions, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import { SERVER_URI } from '@/utils/uri';
 import { WebView } from 'react-native-webview';
+import YoutubePlayer from 'react-native-youtube-iframe';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,38 +20,64 @@ const NewsScreen = () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [viewableItems, setViewableItems] = useState<number[]>([]);
   const flatListRef = useRef<FlatList<NewsType>>(null);
-  const [loadingStates, setLoadingStates] = useState<boolean[]>([]); // Track loading states for each video
-  const [loading, setLoading] = useState<boolean>(true); // Initialize loading state
+  const [loadingStates, setLoadingStates] = useState<boolean[]>([]);
+  const [theme, setTheme] = useState("light");
+  const [largeFontSize, setLargeFontSize] = useState("default");
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchFont = async () => {
+        try {
+          const storedFont = await AsyncStorage.getItem("largeFontSize");
+          if (storedFont) setLargeFontSize(storedFont);
+        } catch (error) {
+          console.error("Error fetching font size:", error);
+        }
+      };
+      fetchFont();
+    }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchTheme = async () => {
+        const storedTheme = await AsyncStorage.getItem("theme");
+        setTheme(storedTheme || "light");
+      };
+      fetchTheme();
+    }, [])
+  );
 
   useEffect(() => {
-    // Fetch only when the component is mounted
     axios
-      .get(`${SERVER_URI}/news`)
-      .then((res: any) => {
+      .get(`${SERVER_URI}/shorts`)
+      .then((res) => {
         setNewsItems(res.data.news);
-        setLoadingStates(new Array(res.data.news.length).fill(false)); // Initialize loading states
+        setLoadingStates(new Array(res.data.news.length).fill(false));
       })
       .catch((error) => {
-        console.error('Error fetching news:', error);
+        console.error("Error fetching news:", error);
       });
   }, []);
 
-  // Viewable items changed callback
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
     if (viewableItems.length > 0) {
       const visibleIndices = viewableItems.map((item) => item.index);
       setCurrentIndex(visibleIndices[0]);
-      setViewableItems(visibleIndices); // Track which items are visible
+      setViewableItems(visibleIndices);
     }
   }, []);
 
   const viewabilityConfig = {
-    itemVisiblePercentThreshold: 20, // Video starts loading/playing when at least 20% visible
+    itemVisiblePercentThreshold: 20,
   };
 
   const renderItem = ({ item, index }: { item: any; index: number }) => {
     const videoId = item.reel_url ? extractVideoId(item.reel_url) : null;
-    const isItemVisible = viewableItems.includes(index); // Check if the item is visible
+    const isItemVisible = viewableItems.includes(index);
+    const videoUrlWithMute = item.reel_url
+      ? `${item.reel_url}?autoplay=1&mute=0&playsinline=1&controls=0`
+      : null;
 
     const handlePress = () => {
       const simplifiedItem = {
@@ -63,29 +91,25 @@ const NewsScreen = () => {
       const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));
       router.push(`/course-details?item=${serializedItem}`);
     };
-    const videoUrlWithMute = item.reel_url ? `${item.reel_url}?autoplay=1&mute=1` : null;
-
-    // Change background color based on loading state
-    const backgroundColor = loadingStates[index] ? 'black' : 'black';
 
     return (
-      <View style={[styles.container, { backgroundColor }]}>
+      <View style={[styles.container, { backgroundColor: theme === "dark" ? "#0C0C0C" : "#e3e3e3" }]}>
         {videoId && isItemVisible ? (
-         <WebView
-         style={{ width: width, height: height, backgroundColor: 'black' }} // Set background color to black
-         javaScriptEnabled={true}
-         domStorageEnabled={true}
-         source={{ uri: videoUrlWithMute || "" }} // Load the video only if visible
-         startInLoadingState={false} // Disable the default loader
-         onLoadStart={() => setLoading(true)} // Set loading to true when loading starts
-         onLoadEnd={() => setLoading(false)} // Set loading to false when loading ends
-         // Optionally handle onError
-       />
+          <WebView
+            style={{ width, height, backgroundColor: "black" }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            source={{ uri: videoUrlWithMute || "" }}
+            startInLoadingState={false}
+          />
         ) : (
-          <Text></Text> // Show placeholder when not visible
+          <View style={styles.noVideoContainer}>
+            <Text style={styles.noVideoText}>No Videos Available</Text>
+          </View>
         )}
 
-        {/* Overlay content (title and button) */}
         <View style={styles.overlay}>
           <TouchableOpacity style={styles.readMoreButton} onPress={handlePress}>
             <Text style={styles.readMoreText}>Read More</Text>
@@ -105,13 +129,23 @@ const NewsScreen = () => {
       showsVerticalScrollIndicator={false}
       snapToAlignment="start"
       decelerationRate="fast"
-      snapToInterval={height} // Snap to the height of the screen
+      snapToInterval={height}
       onViewableItemsChanged={onViewableItemsChanged}
       viewabilityConfig={viewabilityConfig}
       getItemLayout={(data, index) => ({ length: height, offset: height * index, index })}
+      contentContainerStyle={{
+        flexGrow: 1,
+        backgroundColor: theme === "dark" ? "#0C0C0C" : "#e3e3e3",
+      }}
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No Videos Available</Text>
+        </View>
+      }
     />
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -120,6 +154,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: 15,
+  },
+  noVideoContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noVideoText: {
+    color: "#999",
+    fontSize: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 18,
+    color: "#999",
   },
   overlay: {
     position: 'absolute',

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "CG Khabar",
+   "name": "CG Khabar",
     "slug": "cgkhabar",
-    "version": "1.0.0",
+    "version": "1.0.5" , 
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app_icon.jpg",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -12,24 +12,33 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
+   "ios": {
       "bundleIdentifier": "com.cgkhabar.cgkhabarapp",
       "supportsTablet": true
     },
     "android": {
-      "permissions": ["INTERNET"],
+  
+      "permissions": ["INTERNET", "ACCESS_NOTIFICATION_POLICY"],
+   
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "image": "./assets/images/app_icon.jpg"
+     
       },
       "package": "com.cgkhabar.cgkhabarapp"
+    
     },
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": ["expo-router"],
+    "notification": {
+      "icon": "./assets/images/app_icon.jpg",
+      "color": "#C3F458"
+    },
+    "plugins": [
+      "expo-router"
+    ],
     "experiments": {
       "typedRoutes": true
     },
@@ -40,3 +49,4 @@
     }
   }
 }
+

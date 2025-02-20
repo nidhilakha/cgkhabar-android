@@ -1,4 +1,6 @@
-import React, { useRef, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "expo-router";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
 
 interface CategoryType {
@@ -16,6 +18,40 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ categories, activeCateg
   const scrollViewRef = useRef<ScrollView>(null);
   const buttonWidth = 120;
   const spacing = 10;
+
+  const [theme, setTheme] = useState("light");
+  const [largeFontSize, setLargeFontSize] = useState('default'); // State for theme
+
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchFont = async () => {
+        try {
+          const storedFont = await AsyncStorage.getItem("largeFontSize");
+          // console.log("Stored Font:", storedFont); // Log the stored theme
+          if (storedFont) {
+            setLargeFontSize(storedFont);
+          }
+        } catch (error) {
+          console.error("Error fetching theme:", error);
+        }
+      };
+  
+      fetchFont();
+    }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchTheme = async () => {
+        const storedTheme = await AsyncStorage.getItem("theme");
+        setTheme(storedTheme || "light");
+        // console.log("in home screen",storedTheme);
+      };
+      fetchTheme();
+    }, [])
+  );
+
 
   useEffect(() => {
     if (scrollViewRef.current) {
@@ -43,13 +79,14 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ categories, activeCateg
             style={[
               styles.button,
               {
-                backgroundColor: activeCategory === category._id ? "#BF0000" : "#fff",
+                backgroundColor: theme === 'light' ?
+                (activeCategory === category._id ? "#BF0000" : "#fff"): (activeCategory === category._id ? "#BF0000" : "#272829")
               },
             ]}
             onPress={() => setActiveCategory(category._id)}
           >
             <Text style={[styles.text,{
-                              color: activeCategory === category._id ? "#fff" : "#000",
+                              color:theme === 'light' ?( activeCategory === category._id ? "#fff" : "#000"):(activeCategory === category._id ? "#fff" : "#fff"),fontSize: largeFontSize==='large' ? 22 : 18 
 
             },]}>
               {category.name || "anonymous"}

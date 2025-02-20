@@ -1,15 +1,19 @@
 import { View, Text, Image, TouchableOpacity } from "react-native";
-import React from "react";
+import React, { FC } from "react"; // Import FC here
 import { useFonts } from "expo-font";
 import { Raleway_700Bold } from "@expo-google-fonts/raleway";
 import { Nunito_400Regular, Nunito_700Bold } from "@expo-google-fonts/nunito";
 import { LinearGradient } from "expo-linear-gradient";
 import { styles } from "@/styles/onboarding/onboard";
 import { router } from "expo-router";
+import Button from "@/components/button/button";
 
+interface OnBoardingScreenProps {
+  onComplete: () => void; // Define the type for onComplete
+}
 
-export default function OnBoardingScreen() {
-  let [fontsLoaded, fontError] = useFonts({
+const OnBoardingScreen: FC<OnBoardingScreenProps> = ({ onComplete }) => { 
+   let [fontsLoaded, fontError] = useFonts({
     Raleway_700Bold,
     Nunito_400Regular,
     Nunito_700Bold,
@@ -63,16 +67,27 @@ export default function OnBoardingScreen() {
             Discover Today’s Top Stories with CG Khabar
           </Text>
         </View> */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.buttonWrapper}
-          onPress={() => router.push("/(routes)/welcome-intro")}
+          onPress={onComplete} 
+         
         >
           <Text style={[styles.buttonText, { fontFamily: "Nunito_700Bold" }]}>
             Explore With Us ➔
           </Text>
-
+         
+        </TouchableOpacity> */}
+        <TouchableOpacity
+          style={styles.buttonWrapper}
+          onPress={onComplete} 
+        >
+          <Text style={[styles.buttonText, { fontFamily: "Nunito_700Bold" }]}>
+          Explore With Us ➔
+          </Text>
+         
         </TouchableOpacity>
-                  
+
+            
 
       </View>
       <View >
@@ -82,3 +97,5 @@ export default function OnBoardingScreen() {
     </LinearGradient>
   );
 }
+
+export default OnBoardingScreen;
