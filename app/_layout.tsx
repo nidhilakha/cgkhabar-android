@@ -4,18 +4,22 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { router, Stack, useRouter } from "expo-router";
 import { ToastProvider } from "react-native-toast-notifications";
-import { LogBox,Image, Platform, Alert } from "react-native";
+import { LogBox, Image, Platform, Alert, View, TouchableOpacity } from "react-native";
 import axios from "axios";
 import { SERVER_URI } from "@/utils/uri";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Linking } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 import firebase from '@react-native-firebase/app';
+import TextTicker from "react-native-text-ticker";
+import { AudioProvider, useAudio } from "@/components/Audio/AudioContext";
+import { Easing } from "react-native";
+
 export {
   ErrorBoundary,
 } from "expo-router";
 
-SplashScreen.preventAutoHideAsync();
+// SplashScreen.preventAutoHideAsync();
 
 type NotificationData = {
   _id: string;
@@ -29,6 +33,58 @@ type NotificationData = {
     _id: string;
   };
 };
+
+
+const AudioBar = () => {
+  const { isSpeaking, isPaused, currentNewsItem, pauseAudio, stopAudio, playAudio, cleanText } = useAudio();
+
+  if (!isSpeaking || !currentNewsItem) return null;
+
+  return (
+    <View
+      style={{
+        position: "absolute",
+        bottom: 60,
+        left: 10,
+        right: 10,
+        backgroundColor: "black",
+        padding: 15,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderRadius: 30,
+        overflow: "hidden",
+        zIndex: 1000,
+      }}
+    >
+      <View style={{ flex: 1, overflow: "hidden", marginRight: 10 }}>
+        <TextTicker
+          style={{ fontSize: 16, color: "white" }}
+          duration={80000}
+          loop={false}
+          easing={Easing.linear}
+          bounce={false}
+          marqueeDelay={1000}
+          repeatSpacer={0}
+        >
+          {cleanText(currentNewsItem.content)} {/* Now cleanText is available */}
+        </TextTicker>
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TouchableOpacity
+          onPress={isPaused ? () => playAudio(currentNewsItem) : pauseAudio}
+          style={{ marginRight: 15 }}
+        >
+          <FontAwesome name={isPaused ? "play" : "pause"} size={24} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={stopAudio}>
+          <FontAwesome name="close" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -115,7 +171,7 @@ const [isPermissionPopupShown, setIsPermissionPopupShown] = useState(false);
 
       if (enabled) {
         await AsyncStorage.setItem("permissionGranted", "true");
-        await AsyncStorage.setItem("isNotificationEnabled", "true");
+        await AsyncStorage.setItem("isN`otificationEnabled", "true");
 
         getFcmToken();
       } else {
@@ -234,10 +290,45 @@ const [isPermissionPopupShown, setIsPermissionPopupShown] = useState(false);
 };
 
 
-const handleNotificationRedirect = (data: NotificationData) => {
-  const serializedItem = encodeURIComponent(JSON.stringify(data));
-  router.push(`/course-details?item=${serializedItem}`);
+const handleNotificationRedirect = async (data: NotificationData) => {
+  try {
+    // Fetch news details using the ID
+    console.log(data._id);
+    console.log(SERVER_URI);
+    const response = await fetch(`${SERVER_URI}breaking-news/${data._id}`);
+    console.log(response);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch news: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+
+    // Extract `news` object
+    const newsDetails = result.news;
+    if (!newsDetails) {
+      throw new Error("News not found");
+    }
+
+    // Structure data in the required format
+    const simplifiedItem = {
+      id: newsDetails._id,
+      title: newsDetails.title,
+      content: newsDetails.content,
+      featured_image: newsDetails.featured_image,
+      yt_url: newsDetails.yt_url,
+      author: newsDetails.author,
+      createdAt: newsDetails.createdAt,
+      category: newsDetails.category._id,
+    };
+
+    // Serialize and navigate
+    const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));
+    router.push(`/course-details?item=${serializedItem}`);
+  } catch (error) {
+    console.error("Error fetching news details:", error);
+  }
 };
+
 
 useEffect(() => {
   initializeNotificationListeners();
@@ -247,8 +338,12 @@ useEffect(() => {
     return null;
   }
 
-  return <RootLayoutNav />;
-}
+  return (
+    <AudioProvider>
+      <RootLayoutNav />
+      <AudioBar />
+    </AudioProvider>
+  );}
 
 function RootLayoutNav() {
   return (

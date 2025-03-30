@@ -13,6 +13,8 @@ export interface Category {
 // Define the interface for Banner Data
 export interface BannerDataTypes {
   featured_image: string;
+  featured_audio: string;
+slug:string;
   title: string;
   _id: string;
   content: string;
@@ -77,6 +79,8 @@ const HomeBannerSlider: React.FC<HomeBannerSliderProps> = ({ data }) => {
       title: item.title,
       content: item.content,
       featured_image: item.featured_image || "", // Handle missing image
+      featured_audio: item.featured_audio || "", // Handle missing image
+slug:item.slug,
       yt_url: item.yt_url,
       author: item.author,
       createdAt: item.createdAt,

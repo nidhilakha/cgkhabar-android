@@ -87,6 +87,7 @@ const NewsScreen = () => {
         featured_video: item.featured_video,
         yt_url: item.yt_url,
         reel_url: item.reel_url,
+        slug:item.slug,
       };
       const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));
       router.push(`/course-details?item=${serializedItem}`);

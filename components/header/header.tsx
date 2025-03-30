@@ -40,6 +40,7 @@ interface Notification {
     _id: string;
     name: string;
   };
+  slug?:string;
 }
 const { width, height } = Dimensions.get("window");
 
@@ -254,6 +255,7 @@ const getFcmToken = async () => {
       author: item.author,
       createdAt: item.createdAt,
       category: item?.category?._id,
+      slug:item?.slug,
     };
     
     const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));

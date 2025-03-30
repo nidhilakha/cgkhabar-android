@@ -18,7 +18,11 @@ import { router, useNavigation } from "expo-router";
 import { widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useFocusEffect } from "expo-router";
 import * as Speech from "expo-speech";
+import { Audio, AVPlaybackStatus } from "expo-av";
+
+
 import { AppState, AppStateStatus } from "react-native";
+import { useAudio } from "../Audio/AudioContext";
 
 type NewsCardProps = {
   item: NewsType;
@@ -37,15 +41,15 @@ const NewsCard = React.memo(
     const [thumbnailUrl, setThumbnailUrl] = useState("");
     const [theme, setTheme] = useState("light");
     const [largeFontSize, setLargeFontSize] = useState("default"); // State for theme
-    const [isSpeaking, setIsSpeaking] = useState(false);
-    const [isPaused, setIsPaused] = useState(false);
+ 
     const [showControls, setShowControls] = useState(false);
     const [currentText, setCurrentText] = useState("");
+
+    const [currentSound, setCurrentSound] = useState<Audio.Sound | null>(null);
     const [isModalVisible, setIsModalVisible] = useState(false); // State for ScrollingTextModal visibility
     const [audioDuration, setAudioDuration] = useState(60); // Example audio duration in seconds
-    const [currentAudio, setCurrentAudio] = useState(null); // Tracks the currently playing audio
-    const audioRef = useRef<HTMLAudioElement | null>(null); // Ref to manage the audio element
-  
+    const { playAudio, pauseAudio, stopAudio, isSpeaking, isPaused, currentNewsItem, cleanText } = useAudio();
+
 
       useFocusEffect(
         useCallback(() => {
@@ -76,59 +80,75 @@ const NewsCard = React.memo(
         }, [])
       );
     
-      const handleBackPress = () => {
-        if (isSpeaking) {
-          handleStop(); // Stop audio first
-          navigation.goBack(); // Navigate back immediately after stopping audio
-          return true; // Prevent default back action (navigation)
-        }
-        return false; // Allow default back action when no audio is playing
-      };
+      // const handleBackPress = () => {
+      //   if (isSpeaking) {
+      //     handleStop(); // Stop audio first
+      //     navigation.goBack(); // Navigate back immediately after stopping audio
+      //     return true; // Prevent default back action (navigation)
+      //   }
+      //   return false; // Allow default back action when no audio is playing
+      // };
     
-      useEffect(() => {
-        // Add back button listener
-        BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      // useEffect(() => {
+      //   // Add back button listener
+      //   BackHandler.addEventListener('hardwareBackPress', handleBackPress);
     
-        return () => {
-          BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
-        };
-      }, [isSpeaking]);
+      //   return () => {
+      //     BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
+      //   };
+      // }, [isSpeaking]);
 
-      const handleAppStateChange = (nextAppState: AppStateStatus) => {
-        if (currentAppState.match(/active/) && nextAppState.match(/inactive|background/)) {
-          handleStop(); // Stop audio when the app goes to the background
-        }
-        setCurrentAppState(nextAppState);
-      };
+      // const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      //   if (currentAppState.match(/active/) && nextAppState.match(/inactive|background/)) {
+      //     handleStop(); // Stop audio when the app goes to the background
+      //   }
+      //   setCurrentAppState(nextAppState);
+      // };
     
-      useEffect(() => {
-        const subscription = AppState.addEventListener("change", handleAppStateChange);
+      // useEffect(() => {
+      //   const subscription = AppState.addEventListener("change", handleAppStateChange);
     
-        // Cleanup subscription
-        return () => {
-          subscription.remove();
-        };
-      }, [currentAppState]);
+      //   // Cleanup subscription
+      //   return () => {
+      //     subscription.remove();
+      //   };
+      // }, [currentAppState]);
     
     
-      useFocusEffect(
-        useCallback(() => {
-          // Function to stop audio playback
-          const stopAudio = () => {
-            Speech.stop();
-            setIsSpeaking(false);
-            setIsModalVisible(false); // Hide the modal when stopped
-          };
+      // useFocusEffect(
+      //   useCallback(() => {
       
-          // Add event listener to stop audio when the screen loses focus
-          const unsubscribe = navigation.addListener('blur', stopAudio);
+      //     // Function to stop audio when leaving the screen
+      //     const stopAudio = async () => {
       
-          // Cleanup function to remove the event listener
-          return () => {
-            unsubscribe();
-          };
-        }, [navigation])
-      );
+      //       try {
+      //         // Stop text-to-speech (if running)
+      //         await Speech.stop();
+      
+      //         // Stop and unload the audio if it exists
+      //         if (currentSound) {
+      //           await currentSound.stopAsync();
+      //           await currentSound.unloadAsync();
+      //           setCurrentSound(null);
+      //         }
+      
+      //         // Ensure UI updates correctly
+      //         setIsSpeaking(false);
+      //         setIsPaused(false);
+      //         setIsModalVisible(false); // Hide modal when leaving
+      //       } catch (error) {
+      //         console.error("Error stopping audio:", error);
+      //       }
+      //     };
+      
+      //     // Listen for screen blur
+      //     const unsubscribe = navigation.addListener("blur", stopAudio);
+      
+      //     return () => {
+      //       unsubscribe();
+      //     };
+      //   }, [navigation, currentSound]) // Only include stable dependencies
+      // );
     
       useEffect(() => {
         const checkIfSaved = async () => {
@@ -193,9 +213,9 @@ const NewsCard = React.memo(
     
       const handleShare = async () => {
         try {
-          const newsUrl = `myapp://news/${item._id}`; // Use your custom scheme
+          const newsUrl = `https://cgkhabar.com/news/${item.slug}`; // Use the correct URL
           const message = `Check out this news: ${item.title}\n\n${contentPreview}\n\nRead more at: ${newsUrl}`;
-          console.log(message);
+          
           await Share.share({
             message: message,
           });
@@ -203,76 +223,40 @@ const NewsCard = React.memo(
           console.error("Error sharing the news:", error);
         }
       };
-    
-      const cleanText = (html: string): string => {
-        let cleaned = htmlToText(html, {
-          wordwrap: false,
-          selectors: [
-            { selector: "a", format: "skip" }, // Skip anchor tags
-            { selector: "img", format: "skip" }, // Skip image tags
-            {
-              selector: "p",
-              options: {
-                leadingLineBreaks: 1, // Add line breaks before paragraphs
-                trailingLineBreaks: 1, // Add line breaks after paragraphs
-              },
-            },
-          ],
-          preserveNewlines: true, // Preserve newline characters
-        });
-      
-        // Remove extra spaces, line breaks, and special characters
-        cleaned = cleaned.replace(/\s+/g, " ").trim();
-        return cleaned;
-      };
       
     
-      const handleSpeechStart = () => {
-        // Stop the currently playing speech immediately
-        handleStop();
+      // const cleanText = (html: string): string => {
+      //   let cleaned = htmlToText(html, {
+      //     wordwrap: false,
+      //     selectors: [
+      //       { selector: "a", format: "skip" }, // Skip anchor tags
+      //       { selector: "img", format: "skip" }, // Skip image tags
+      //       {
+      //         selector: "p",
+      //         options: {
+      //           leadingLineBreaks: 1, // Add line breaks before paragraphs
+      //           trailingLineBreaks: 1, // Add line breaks after paragraphs
+      //         },
+      //       },
+      //     ],
+      //     preserveNewlines: true, // Preserve newline characters
+      //   });
+      
+      //   // Remove extra spaces, line breaks, and special characters
+      //   cleaned = cleaned.replace(/\s+/g, " ").trim();
+      //   return cleaned;
+      // };
+      
     
-        // Set the new text to read
-        const textToRead = `${item.title}. ${cleanText(item.content)}`;
-        setCurrentText(textToRead);
-    
-        // Start the new speech immediately after stopping the previous one
-        setIsSpeaking(true);
-        Speech.speak(textToRead, {
-          language: "hi-IN", // Language is Hindi
-          pitch: 1.0,
-          rate: 0.8,
-          onDone: () => {
-            setIsSpeaking(false);
-          },
-          onStopped: () => {
-            setIsSpeaking(false);
-          },
-        });
-      };
-    
-      const handleStop = () => {
-        // Stop the speech and reset the speaking state
-        Speech.stop();
-        setIsSpeaking(false);
-        setIsPaused(false);
-      };
-    
+      const handleSpeechStart = () => playAudio(item);
+      const handlePause = () => pauseAudio();
       const handlePlay = () => {
-        if (isPaused) {
-          Speech.resume();
-          setIsSpeaking(true);
-          setIsPaused(false);
-        }
+        if (isPaused && currentNewsItem?._id === item._id) playAudio(item); // Resume if paused
       };
-    
-      const handlePause = () => {
-        if (isSpeaking) {
-          Speech.pause();
-          setIsSpeaking(false);
-          setIsPaused(true);
-        }
-      };
+      const handleStop = () => stopAudio();
 
+    
+   
       
 
     const extractVideoId = (url: string) => {
@@ -323,6 +307,8 @@ const NewsCard = React.memo(
         title: item.title,
         content: item.content,
         featured_image: item.featured_image,
+        featured_audio: item.featured_audio,
+slug:item.slug,
         yt_url: item.yt_url,
         author: item.author,
         createdAt: item.createdAt,
@@ -374,140 +360,124 @@ const NewsCard = React.memo(
           </View>
         </View>
         <View style={styles.buttonsWrapper}>
-        {/* <Text style={theme==='light'?styles.createdAt:styles.createdAt2 }>{displayDate}</Text> */}
-
-        <View>
-        {isSpeaking ? (
-  <TouchableOpacity
-    onPress={handleStop}
-    style={{
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      paddingVertical: 2,
-      paddingHorizontal: 5,
-      borderWidth: 1.5,
-      borderColor: "#9E9E9E",
-      borderRadius: 20, // Rounded edges for the button
-    }}
-  >
-    <View
-      style={{
-        width: 20,
-        height: 20,
-        borderRadius: 20, // Makes the icon container circular
-        justifyContent: "center",
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#BF0000",
-        marginRight: 8, // Adds space between icon and text
-        backgroundColor: "#BF0000",
-      }}
-    >
-      <FontAwesome
-        name="volume-off"
-        size={12}
-        color="#fff"
-      />
-    </View>
-    <Text
-      style={{
-        fontSize: 12,
-        color: theme === "light" ? "#333" : "#9E9E9E",
-      }}
-    >
-      ऑडियो रोकें
-    </Text>
-  </TouchableOpacity>
-) : (
-  <TouchableOpacity
-    onPress={handleSpeechStart}
-    style={{
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      paddingVertical: 2,
-      paddingHorizontal: 5,
-      borderWidth: 1.5,
-      borderColor: "#9E9E9E",
-      borderRadius: 20, // Rounded edges for the button
-    }}
-  >
-    <View
-      style={{
-        width: 20,
-        height: 20,
-        borderRadius: 20, // Makes the icon container circular
-        justifyContent: "center",
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#BF0000",
-        marginRight: 8, // Adds space between icon and text
-        backgroundColor: "#BF0000",
-      }}
-    >
-      <FontAwesome
-        name="volume-up"
-        size={12}
-        color="#fff"
-      />
-    </View>
-    <Text
-      style={{
-        fontSize: 12,
-        color: theme === "light" ? "#333" : "#9E9E9E",
-      }}
-    >
-      ऑडियो सुनें
-    </Text>
-  </TouchableOpacity>
-)}
-
-        </View>
-        {/* Use ScrollingTextModal */}
-        {/* <ScrollingTextModal
-        isVisible={isModalVisible}
-        text={currentText}
-        isPlaying={isSpeaking}
-        
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onStop={handleStop}
-      /> */}
+      {item.featured_audio ? (
+                  isSpeaking && currentNewsItem?._id === item._id ? (
+                    isPaused ? (
+                      <TouchableOpacity
+                        onPress={() => handlePlay()}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          paddingVertical: 2,
+                          paddingHorizontal: 5,
+                          borderWidth: 1.5,
+                          borderColor: "#9E9E9E",
+                          borderRadius: 20,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 20,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            borderWidth: 1,
+                            borderColor: "#BF0000",
+                            marginRight: 8,
+                            backgroundColor: "#BF0000",
+                          }}
+                        >
+                          <FontAwesome name="play" size={12} color="#fff" />
+                        </View>
+                        <Text style={{ fontSize: 14, color: theme === "light" ? "#333" : "#9E9E9E" }}>
+                          ऑडियो चलाएं
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={handlePause}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          paddingVertical: 2,
+                          paddingHorizontal: 5,
+                          borderWidth: 1.5,
+                          borderColor: "#9E9E9E",
+                          borderRadius: 20,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 20,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            borderWidth: 1,
+                            borderColor: "#BF0000",
+                            marginRight: 8,
+                            backgroundColor: "#BF0000",
+                          }}
+                        >
+                          <FontAwesome name="pause" size={12} color="#fff" />
+                        </View>
+                        <Text style={{ fontSize: 14, color: theme === "light" ? "#333" : "#9E9E9E" }}>
+                          ऑडियो रोकें
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleSpeechStart()}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingVertical: 2,
+                        paddingHorizontal: 5,
+                        borderWidth: 1.5,
+                        borderColor: "#9E9E9E",
+                        borderRadius: 20,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 20,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          borderWidth: 1,
+                          borderColor: "#BF0000",
+                          marginRight: 8,
+                          backgroundColor: "#BF0000",
+                        }}
+                      >
+                        <FontAwesome name="volume-up" size={12} color="#fff" />
+                      </View>
+                      <Text style={{ fontSize: 14, color: theme === "light" ? "#333" : "#9E9E9E" }}>
+                        ऑडियो सुनें
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                ) : (
+                  <View />
+                )}
         <View style={styles.buttons}>
           <TouchableOpacity style={styles.button} onPress={handleSave}>
             <FontAwesome
               name="bookmark"
               size={14}
-              color={
-                theme === "light"
-                  ? isSaved
-                    ? "red"
-                    : "#333"
-                  : isSaved
-                    ? "red"
-                    : "#9E9E9E"
-              }
+              color={theme === "light" ? (isSaved ? "red" : "#333") : isSaved ? "red" : "#9E9E9E"}
             />
-            <Text
-              style={theme === "light" ? styles.buttonText : styles.buttonText2}
-            >
-              {" "}
-              सेव
-            </Text>
+            <Text style={theme === "light" ? styles.buttonText : styles.buttonText2}> सेव</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.button} onPress={handleShare}>
-            <FontAwesome
-              name="share"
-              size={14}
-              color={theme === "dark" ? "#9E9E9E" : "#333"}
-            />
-            <Text
-              style={theme === "light" ? styles.buttonText : styles.buttonText2}
-            >
-              {" "}
-              शेयर
-            </Text>
+            <FontAwesome name="share" size={14} color={theme === "dark" ? "#9E9E9E" : "#333"} />
+            <Text style={theme === "light" ? styles.buttonText : styles.buttonText2}> शेयर</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -539,6 +509,7 @@ const styles = StyleSheet.create({
     textAlign: "left",
     // fontFamily: "Raleway_600SemiBold",
     fontWeight:500,
+
     color: "#000",
   },
   title2: {
@@ -546,6 +517,7 @@ const styles = StyleSheet.create({
     textAlign: "left",
     // fontFamily: "Raleway_600SemiBold",
     fontWeight:500,
+
     color: "#fff",
   },
   buttonsWrapper: {

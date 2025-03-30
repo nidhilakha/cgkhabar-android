@@ -17,6 +17,7 @@ import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 // import CourseCard from "@/components/cards/course.card";
 import NewsCard from "@/components/cards/news.cards";
+import { Audio, AVPlaybackStatus } from "expo-av";
 
 import React, {
   useLayoutEffect,
@@ -37,6 +38,7 @@ import { htmlToText } from "html-to-text";
 import { useFocusEffect } from "expo-router";
 import { AppState, AppStateStatus } from "react-native";
 import WebView from "react-native-webview";
+import { useAudio } from "@/components/Audio/AudioContext";
 
 
 declare global {
@@ -68,7 +70,6 @@ export default function NewsDetailScreen() {
   const newsItem = JSON.parse(item as string);
 // console.log("newsitem",newsItem);
 const [relatedNews, setRelatedNews] = useState([]);
-  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const videoUri = `${SERVER_URI}/videos/${newsItem.featured_video}`;
 
@@ -79,9 +80,9 @@ const [relatedNews, setRelatedNews] = useState([]);
   const [theme, setTheme] = useState('light'); // State for theme
   const [largeFontSize, setLargeFontSize] = useState('default'); // State for theme
   const isFetchingRef = useRef(false);
-  const [currentText, setCurrentText] = useState("");
-  const [currentAppState, setCurrentAppState] = useState(AppState.currentState);
- 
+  const { playAudio, pauseAudio, stopAudio, resumeAudio, isSpeaking, isPaused, currentNewsItem, cleanText } = useAudio();
+
+
   useEffect(() => {
     const fetchFont = async () => {
       try {
@@ -180,59 +181,71 @@ const [relatedNews, setRelatedNews] = useState([]);
     }
   }, [newsItem]);
 
-  const handleBackPress = () => {
-    if (isSpeaking) {
-      handleStop(); // Stop audio first
-      navigation.goBack(); // Navigate back immediately after stopping audio
-      return true; // Prevent default back action (navigation)
-    }
-    return false; // Allow default back action when no audio is playing
-  };
+  // useEffect(() => {
+  //   const handleBackPress = () => {
+  //     if (isSpeaking) {
+  //       console.log("Back button pressed, stopping audio...");
+        
+  //       // Stop speech and audio synchronously
+  //       Speech.stop();
+  
+  //       if (currentSound) {
+  //         currentSound.stopAsync().then(() => {
+  //           currentSound.unloadAsync();
+  //           setCurrentSound(null);
+  //         });
+  //       }
+  
+  //       setIsSpeaking(false);
+  //       navigation.goBack(); // Navigate back
+  
+  //       return true; // Prevent default back action
+  //     }
+  //     return false; // Allow default back action
+  //   };
+  
+  //   // Attach event listener
+  //   const backHandler = BackHandler.addEventListener("hardwareBackPress", handleBackPress);
+  
+  //   // Cleanup function
+  //   return () => backHandler.remove();
+  // }, [isSpeaking, navigation, currentSound]);
 
-  useEffect(() => {
-    // Add back button listener
-    BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-
-    return () => {
-      BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
-    };
-  }, [isSpeaking]);
-
   
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (currentAppState.match(/active/) && nextAppState.match(/inactive|background/)) {
-        handleStop(); // Stop audio when the app goes to the background
-      }
-      setCurrentAppState(nextAppState);
-    };
+  //   const handleAppStateChange = (nextAppState: AppStateStatus) => {
+  //     if (currentAppState.match(/active/) && nextAppState.match(/inactive|background/)) {
+  //       handleStop(); // Stop audio when the app goes to the background
+  //     }
+  //     setCurrentAppState(nextAppState);
+  //   };
   
-    useEffect(() => {
-      const subscription = AppState.addEventListener("change", handleAppStateChange);
+  //   useEffect(() => {
+  //     const subscription = AppState.addEventListener("change", handleAppStateChange);
   
-      // Cleanup subscription
-      return () => {
-        subscription.remove();
-      };
-    }, [currentAppState]);
+  //     // Cleanup subscription
+  //     return () => {
+  //       subscription.remove();
+  //     };
+  //   }, [currentAppState]);
   
   
-    useFocusEffect(
-      useCallback(() => {
-        // Function to stop audio playback
-        const stopAudio = () => {
-          Speech.stop();
-          setIsSpeaking(false);
-        };
+  //   useFocusEffect(
+  //     useCallback(() => {
+  //       // Function to stop audio playback
+  //       const stopAudio = () => {
+  //         Speech.stop();
+  //         setIsSpeaking(false);
+  //       };
     
-        // Add event listener to stop audio when the screen loses focus
-        const unsubscribe = navigation.addListener('blur', stopAudio);
+  //       // Add event listener to stop audio when the screen loses focus
+  //       const unsubscribe = navigation.addListener('blur', stopAudio);
     
-        // Cleanup function to remove the event listener
-        return () => {
-          unsubscribe();
-        };
-      }, [navigation])
-    );
+  //       // Cleanup function to remove the event listener
+  //       return () => {
+  //         unsubscribe();
+  //       };
+  //     }, [navigation])
+  //   );
   
 
   const handlePress = (selectedNewsItem: NewsType) => {
@@ -325,14 +338,12 @@ const [relatedNews, setRelatedNews] = useState([]);
 
   const handleShare = async () => {
     try {
-      // Convert HTML content to plain text
-      const plainTextContent = htmlToText(newsItem.content);
+    
   
-      // Get the first two lines of content (you can adjust the logic as needed)
-      const contentLines = plainTextContent.split('\n').slice(0, 2).join('\n');
+      const newsUrl = `https://cgkhabar.com/news/${newsItem.slug}`;
   
       // Create the message to share
-      const message = `${newsItem.featured_image}\n\n**${newsItem.title}**\n\n${contentLines}...`;
+      const message = `${newsUrl}`;
   
       // Share the content
       await Share.share({
@@ -342,62 +353,38 @@ const [relatedNews, setRelatedNews] = useState([]);
       console.error("Error sharing the news:", error);
     }
   };
+  
   // Determine how much content to show
   const contentPreviewLength = 900;
 
-const cleanText = (html: string): string => {
-    let cleaned = htmlToText(html, {
-      wordwrap: false,
-      selectors: [
-        { selector: "a", format: "skip" }, // Skip anchor tags
-        { selector: "img", format: "skip" }, // Skip image tags
-        {
-          selector: "p",
-          options: {
-            leadingLineBreaks: 1, // Add line breaks before paragraphs
-            trailingLineBreaks: 1, // Add line breaks after paragraphs
-          },
-        },
-      ],
-      preserveNewlines: true, // Preserve newline characters
-    });
+// const cleanText = (html: string): string => {
+//     let cleaned = htmlToText(html, {
+//       wordwrap: false,
+//       selectors: [
+//         { selector: "a", format: "skip" }, // Skip anchor tags
+//         { selector: "img", format: "skip" }, // Skip image tags
+//         {
+//           selector: "p",
+//           options: {
+//             leadingLineBreaks: 1, // Add line breaks before paragraphs
+//             trailingLineBreaks: 1, // Add line breaks after paragraphs
+//           },
+//         },
+//       ],
+//       preserveNewlines: true, // Preserve newline characters
+//     });
   
-    // Remove extra spaces, line breaks, and special characters
-    cleaned = cleaned.replace(/\s+/g, " ").trim();
-    return cleaned;
+//     // Remove extra spaces, line breaks, and special characters
+//     cleaned = cleaned.replace(/\s+/g, " ").trim();
+//     return cleaned;
+//   };
+
+  const handleSpeechStart = (item: any) => playAudio(item);
+  const handlePause = () => pauseAudio();
+  const handlePlay = (item: any) => {
+    if (isPaused && currentNewsItem?._id === item._id) resumeAudio();
   };
-
-    const handleSpeechStart = () => {
-      if (isSpeaking) {
-        // If speech is already playing, stop it
-        handleStop();
-      } else {
-        const textToRead = `${newsItem.title}. ${cleanText(newsItem.content)}`;
-        setCurrentText(textToRead);
-        setIsSpeaking(true);
-  
-        Speech.speak(textToRead, {
-          language: "hi-IN", // Change to Hindi
-          pitch: 1.0,
-          rate: 0.8,
-  
-          onDone: () => {
-            setIsSpeaking(false);
-          },
-          onStopped: () => {
-            setIsSpeaking(false);
-          },
-        });
-      }
-    };
-  
- 
-
-  
-    const handleStop = () => {
-      Speech.stop();
-      setIsSpeaking(false);
-    };
+  const handleStop = () => stopAudio();
 
     const extractTweetUrl = (htmlContent:any) => {
       const match = htmlContent.match(/https:\/\/twitter\.com\/.*?\/status\/\d+/);
@@ -499,49 +486,128 @@ const cleanText = (html: string): string => {
     : "रायपुर | संवाददाता"}
                 </Text>
 
-                <View>
-          <TouchableOpacity
-            onPress={handleSpeechStart}
+                {newsItem.featured_audio && (
+  <View>
+    {isSpeaking && currentNewsItem?._id === newsItem._id ? (
+      isPaused ? (
+        <TouchableOpacity
+          onPress={() => handlePlay(newsItem)} // Resume audio
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingVertical: 2,
+            paddingHorizontal: 5,
+            borderWidth: 1.5,
+            borderColor: "#9E9E9E",
+            borderRadius: 20,
+          }}
+        >
+          <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
+              width: 20,
+              height: 20,
+              borderRadius: 20,
               justifyContent: "center",
-              paddingVertical: 2,
-              paddingHorizontal: 5,
-              borderWidth: 1.5,
-              borderColor: "#9E9E9E",
-              borderRadius: 20, // Rounded edges for the button
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: "#BF0000",
+              marginRight: 8,
+              backgroundColor: "#BF0000",
             }}
           >
-            <View
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 20, // Makes the icon container circular
-                justifyContent: "center",
-                alignItems: "center",
-                borderWidth: 1,
-                borderColor: "#BF0000",
-                marginRight: 8, // Adds space between icon and text
-                backgroundColor: "#BF0000",
-              }}
-            >
-              <FontAwesome
-                name={isSpeaking ? "volume-off" : "volume-up"}
-                size={12}
-                color="#fff"
-              />
-            </View>
-            <Text
-              style={{
-                fontSize: 12,
-                color: theme === "light" ? "#333" : "#9E9E9E",
-              }}
-            >
-              {isSpeaking ? "ऑडियो रोकें" : "ऑडियो सुनें"}
-            </Text>
-          </TouchableOpacity>
+            <FontAwesome name="play" size={12} color="#fff" />
+          </View>
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme === "light" ? "#333" : "#9E9E9E",
+            }}
+          >
+            ऑडियो चलाएं
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={handlePause} // Pause audio
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingVertical: 2,
+            paddingHorizontal: 5,
+            borderWidth: 1.5,
+            borderColor: "#9E9E9E",
+            borderRadius: 20,
+          }}
+        >
+          <View
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: 20,
+              justifyContent: "center",
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: "#BF0000",
+              marginRight: 8,
+              backgroundColor: "#BF0000",
+            }}
+          >
+            <FontAwesome name="pause" size={12} color="#fff" />
+          </View>
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme === "light" ? "#333" : "#9E9E9E",
+            }}
+          >
+            ऑडियो रोकें
+          </Text>
+        </TouchableOpacity>
+      )
+    ) : (
+      <TouchableOpacity
+        onPress={() => handleSpeechStart(newsItem)} // Start audio
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: 2,
+          paddingHorizontal: 5,
+          borderWidth: 1.5,
+          borderColor: "#9E9E9E",
+          borderRadius: 20,
+        }}
+      >
+        <View
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 20,
+            justifyContent: "center",
+            alignItems: "center",
+            borderWidth: 1,
+            borderColor: "#BF0000",
+            marginRight: 8,
+            backgroundColor: "#BF0000",
+          }}
+        >
+          <FontAwesome name="volume-up" size={12} color="#fff" />
         </View>
+        <Text
+          style={{
+            fontSize: 12,
+            color: theme === "light" ? "#333" : "#9E9E9E",
+          }}
+        >
+          ऑडियो सुनें
+        </Text>
+      </TouchableOpacity>
+    )}
+  </View>
+)}
+
         
                 <Text
                   style={{

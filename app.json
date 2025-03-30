@@ -2,15 +2,15 @@
   "expo": {
    "name": "CG Khabar",
     "slug": "cgkhabar",
-    "version": "1.0.5" , 
+    "version": "1.0.6" , 
     "orientation": "portrait",
     "icon": "./assets/images/app_icon.jpg",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#A6121F"
     },
    "ios": {
       "bundleIdentifier": "com.cgkhabar.cgkhabarapp",

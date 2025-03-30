@@ -24,14 +24,13 @@ interface NewsType {
   content: string;
   // likes: number;
   featured_image?: string;
-  // featured_video?: string;
+  featured_audio?: string;
   thumbnail?: string; // Thumbnail for the video
   deleted?: boolean; // Add a flag for deleted news
-
+slug:string;
   // comments: Comment[];
   createdAt:Date;
   category:CategoryType;
-  
   banner:Number;
   priority:Number;
 

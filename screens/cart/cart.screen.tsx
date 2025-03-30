@@ -8,7 +8,7 @@ import { router, useNavigation } from "expo-router";
 import { htmlToText } from "html-to-text";
 import { widthPercentageToDP as wp } from "react-native-responsive-screen";
 import * as Speech from "expo-speech";
-
+import { Audio } from "expo-av";
 import { useCallback, useEffect, useState } from "react";
 import {
   View,
@@ -21,124 +21,57 @@ import {
   Dimensions,
   BackHandler,
 } from "react-native";
-// import { Video } from "expo-av"; // Import Video component
 import Header from "@/components/header/header";
 import { useFocusEffect } from "expo-router";
 import { AppState, AppStateStatus } from "react-native";
+import { useAudio } from "@/components/Audio/AudioContext";
 
 const { width, height } = Dimensions.get("window");
 
 export default function CartScreen() {
-    const navigation = useNavigation();
+  const navigation = useNavigation();
   const [currentAppState, setCurrentAppState] = useState(AppState.currentState);
-
   const [cartItems, setCartItems] = useState<NewsType[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState("");
-
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
-  const [theme, setTheme] = useState('light'); // State for theme
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [currentText, setCurrentText] = useState("");
+  const [theme, setTheme] = useState("light");
+  const { playAudio, pauseAudio, stopAudio, resumeAudio, isSpeaking, isPaused, currentNewsItem, cleanText } = useAudio();
 
   useEffect(() => {
     const fetchTheme = async () => {
       try {
         const storedTheme = await AsyncStorage.getItem("theme");
-        // console.log("Stored Theme:", storedTheme); // Log the stored theme
-        if (storedTheme) {
-          setTheme(storedTheme);
-        }
+        if (storedTheme) setTheme(storedTheme);
       } catch (error) {
         console.error("Error fetching theme:", error);
       }
     };
-
     fetchTheme();
   }, []);
 
-  const [largeFontSize, setLargeFontSize] = useState('default'); // State for theme
+  const [largeFontSize, setLargeFontSize] = useState("default");
 
   useEffect(() => {
     const fetchFont = async () => {
       try {
         const storedFont = await AsyncStorage.getItem("largeFontSize");
-        console.log("Stored Font:", storedFont); // Log the stored theme
-        if (storedFont) {
-          setLargeFontSize(storedFont);
-        }
+        if (storedFont) setLargeFontSize(storedFont);
       } catch (error) {
-        console.error("Error fetching theme:", error);
+        console.error("Error fetching font:", error);
       }
     };
-
     fetchFont();
   }, []);
 
-  
   useEffect(() => {
     const subscription = async () => {
       const cart: any = await AsyncStorage.getItem("cart");
-      if (cart) {
-        setCartItems(JSON.parse(cart));
-      }
+      if (cart) setCartItems(JSON.parse(cart));
     };
     subscription();
   }, []);
-
-  const handleBackPress = () => {
-    if (isSpeaking) {
-      handleStop(); // Stop audio first
-      navigation.goBack(); // Navigate back immediately after stopping audio
-      return true; // Prevent default back action (navigation)
-    }
-    return false; // Allow default back action when no audio is playing
-  };
-
-  useEffect(() => {
-    // Add back button listener
-    BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-
-    return () => {
-      BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
-    };
-  }, [isSpeaking]);
-
-  const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (currentAppState.match(/active/) && nextAppState.match(/inactive|background/)) {
-        handleStop(); // Stop audio when the app goes to the background
-      }
-      setCurrentAppState(nextAppState);
-    };
-  
-    useEffect(() => {
-      const subscription = AppState.addEventListener("change", handleAppStateChange);
-  
-      // Cleanup subscription
-      return () => {
-        subscription.remove();
-      };
-    }, [currentAppState]);
-
-
-   useFocusEffect(
-        useCallback(() => {
-          // Function to stop audio playback
-          const stopAudio = () => {
-            Speech.stop();
-            setIsSpeaking(false);
-          };
-      
-          // Add event listener to stop audio when the screen loses focus
-          const unsubscribe = navigation.addListener('blur', stopAudio);
-      
-          // Cleanup function to remove the event listener
-          return () => {
-            unsubscribe();
-          };
-        }, [navigation])
-      );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -146,13 +79,6 @@ export default function CartScreen() {
     setCartItems(cart ? JSON.parse(cart) : []);
     setRefreshing(false);
   };
-
-  // const handleCourseDetails = (courseDetails: any) => {
-  //   router.push({
-  //     pathname: "/(routes)/course-details",
-  //     params: { item: JSON.stringify(courseDetails) },
-  //   });
-  // };
 
   const handleRemoveItem = async (item: any) => {
     const existingCartData = await AsyncStorage.getItem("cart");
@@ -162,19 +88,11 @@ export default function CartScreen() {
     setCartItems(updatedCartData);
   };
 
-  const getGifUrl = (videoUrl: string) => {
-    const urlParts = videoUrl.split("/");
-    if (urlParts.length > 6) {
-      const cloudName = urlParts[3]; // e.g., 'dzbbadosd'
-      const version = urlParts[6].substring(1); // e.g., '1726047638', removing 'v'
-      const videoPublicId = urlParts.slice(7).join("/").replace(".mp4", ""); // Extract public ID without extension
-
-      // Construct the GIF URL dynamically based on the video URL
-      return `https://res.cloudinary.com/${cloudName}/video/upload/so_5,du_3,w_300,h_200,f_gif/v${version}/${videoPublicId}.gif`;
-    } else {
-      // Default GIF URL if featured_video is missing
-      return "https://via.placeholder.com/300x200?text=No+Video";
-    }
+  const getThumbnailUrl = (item: NewsType) => {
+    const videoId = extractVideoId(item.yt_url || "");
+    return videoId
+      ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+      : item.featured_image || "https://via.placeholder.com/300x200?text=No+Image";
   };
 
   const extractVideoId = (url: string) => {
@@ -183,209 +101,211 @@ export default function CartScreen() {
     const match = url.match(regex);
     return match ? match[1] : null;
   };
-  const getThumbnailUrl = (item: NewsType) => {
-    const videoId = extractVideoId(item.yt_url || "");
-    return videoId
-      ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-      : item.featured_image ||
-          "https://via.placeholder.com/300x200?text=No+Image";
-  };
+
   const handlePress = (item: any) => {
-    // Serialize only necessary fields
     const simplifiedItem = {
       id: item._id,
       title: item.title,
       content: item.content,
       featured_image: item.featured_image,
+      featured_audio: item.featured_audio,
+      slug: item.slug,
       yt_url: item.yt_url,
       author: item.author,
       createdAt: item.createdAt,
-      category: item.category._id // Extracting the _id from category object
+      category: item.category._id,
     };
     const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));
     router.push(`/course-details?item=${serializedItem}`);
   };
-  
- 
-    const cleanText = (html: string): string => {
-      let cleaned = htmlToText(html, {
-        wordwrap: false,
-        selectors: [
-          { selector: "a", format: "skip" }, // Skip anchor tags
-          { selector: "img", format: "skip" }, // Skip image tags
-          {
-            selector: "p",
-            options: {
-              leadingLineBreaks: 1, // Add line breaks before paragraphs
-              trailingLineBreaks: 1, // Add line breaks after paragraphs
-            },
-          },
-        ],
-        preserveNewlines: true, // Preserve newline characters
-      });
-    
-      // Remove extra spaces, line breaks, and special characters
-      cleaned = cleaned.replace(/\s+/g, " ").trim();
-      return cleaned;
-    };
 
-    const handleStop = () => {
-      Speech.stop();
-      setIsSpeaking(false);
-    };
-    const handleSpeechStart= async (item: NewsType) =>{
-      if (isSpeaking) {
-        // If speech is already playing, stop it
-        handleStop();
-      } else {
-        const textToRead = `${item.title}. ${cleanText(item.content)}`;
-        setCurrentText(textToRead);
-        // setIsModalVisible(true); // Show the ScrollingTextModal
-        setIsSpeaking(true);
-  
-        Speech.speak(textToRead, {
-          language: "hi-IN", // Change to Hindi
-          pitch: 1.0,
-          rate: 1.0,
-          onDone: () => {
-            setIsSpeaking(false);
-          },
-          onStopped: () => {
-            setIsSpeaking(false);
-          },
-        });
-      }
-    };
+  // Define audio control functions with item parameter
+  const handleSpeechStart = (item: any) => playAudio(item);
+  const handlePause = () => pauseAudio();
+  const handlePlay = (item: any) => {
+    if (isPaused && currentNewsItem?._id === item._id) resumeAudio();
+  };
+  const handleStop = () => stopAudio();
 
-
-    
   return (
     <LinearGradient
-    colors={theme === 'dark' ? ['#0C0C0C', '#0C0C0C'] : ['#F2F2F2', '#e3e3e3']}
-    style={{ flex: 1, paddingTop: 50 }}
-  >
+      colors={theme === "dark" ? ["#0C0C0C", "#0C0C0C"] : ["#F2F2F2", "#e3e3e3"]}
+      style={{ flex: 1, paddingTop: 50 }}
+    >
       <Header />
       <FlatList
         data={cartItems}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => {
-          const extractVideoId = (url: string) => {
-              const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-              const match = url.match(regex);
-              return match ? match[1] : null;
-          };
-      
-          const videoId = extractVideoId(item.yt_url || "");
-          const thumbnailUrl = videoId
-              ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-              : "https://via.placeholder.com/300x200?text=No+Video";
-      
-          return (
-              <TouchableOpacity
-              style={theme==='light'?styles.container:styles.container2}
-                  onPress={() => handlePress(item)}
-              >
-                  <View style={styles.contentWrapper}>
-                      <View style={{ flex: 2 }}>
-                          <Text style={[
-  theme === 'light' ? styles.title : styles.title2, // Apply base styles based on theme
-  { fontSize: largeFontSize==='large' ? 24 : 20 } // Set font size conditionally
-]}>{item?.title}</Text>
-                         
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={theme === "light" ? styles.container : styles.container2}
+            onPress={() => handlePress(item)}
+          >
+            <View style={styles.contentWrapper}>
+              <View style={{ flex: 2 }}>
+                <Text
+                  style={[
+                    theme === "light" ? styles.title : styles.title2,
+                    { fontSize: largeFontSize === "large" ? 24 : 20 },
+                  ]}
+                >
+                  {item?.title}
+                </Text>
+              </View>
+              <View style={{ position: "relative" }}>
+                <Image
+                  source={{ uri: getThumbnailUrl(item) }}
+                  style={styles.videoThumbnail}
+                  key={item._id || item.yt_url || item.featured_image || "default-key"}
+                  resizeMode="cover"
+                />
+                {item.yt_url && (
+                  <FontAwesome
+                    name="youtube-play"
+                    size={25}
+                    color="red"
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      transform: [{ translateX: -15 }, { translateY: -15 }],
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      borderRadius: 50,
+                      padding: 8,
+                    }}
+                  />
+                )}
+              </View>
+            </View>
+            <View style={styles.buttonsWrapper}>
+              <View style={{ width: 110 }}>
+                {item.featured_audio ? (
+                  isSpeaking && currentNewsItem?._id === item._id ? (
+                    isPaused ? (
+                      <TouchableOpacity
+                        onPress={() => handlePlay(item)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          paddingVertical: 2,
+                          paddingHorizontal: 5,
+                          borderWidth: 1.5,
+                          borderColor: "#9E9E9E",
+                          borderRadius: 20,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 20,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            borderWidth: 1,
+                            borderColor: "#BF0000",
+                            marginRight: 8,
+                            backgroundColor: "#BF0000",
+                          }}
+                        >
+                          <FontAwesome name="play" size={12} color="#fff" />
+                        </View>
+                        <Text style={{ fontSize: 14, color: theme === "light" ? "#333" : "#9E9E9E" }}>
+                          ऑडियो चलाएं
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={handlePause}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          paddingVertical: 2,
+                          paddingHorizontal: 5,
+                          borderWidth: 1.5,
+                          borderColor: "#9E9E9E",
+                          borderRadius: 20,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 20,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            borderWidth: 1,
+                            borderColor: "#BF0000",
+                            marginRight: 8,
+                            backgroundColor: "#BF0000",
+                          }}
+                        >
+                          <FontAwesome name="pause" size={12} color="#fff" />
+                        </View>
+                        <Text style={{ fontSize: 14, color: theme === "light" ? "#333" : "#9E9E9E" }}>
+                          ऑडियो रोकें
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleSpeechStart(item)}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingVertical: 2,
+                        paddingHorizontal: 5,
+                        borderWidth: 1.5,
+                        borderColor: "#9E9E9E",
+                        borderRadius: 20,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 20,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          borderWidth: 1,
+                          borderColor: "#BF0000",
+                          marginRight: 8,
+                          backgroundColor: "#BF0000",
+                        }}
+                      >
+                        <FontAwesome name="volume-up" size={12} color="#fff" />
                       </View>
-                      <View style={{ position: 'relative' }}>
-  <Image
-               source={{
-                 uri: getThumbnailUrl(item),
-               }}
-               style={styles.videoThumbnail}
-               key={item._id || item.yt_url || item.featured_image || "default-key"}
-               resizeMode="cover"
-             />
-  
-  {/* YouTube Icon */}
-  {item.yt_url && (
-    <FontAwesome
-    name="youtube-play"
-    size={25} // Icon size
-    color="red" // Icon color
-    style={{
-      position: "absolute",
-      top: "50%", // Position the icon vertically in the center
-      left: "50%", // Position the icon horizontally in the center
-      transform: [
-        { translateX: -15 }, // Adjust horizontally to center the icon
-        { translateY: -15 }, // Adjust vertically to center the icon
-      ],
-      backgroundColor: "rgba(255, 255, 255, 0.8)", // Background color for visibility
-      borderRadius: 50, // Optional: Rounded background
-      padding: 8, // Padding inside the icon for spacing
-    }}
-  />
-  )}
-</View>
-                  </View>
-                  <View style={styles.buttonsWrapper}>
-                      {/* <Text style={theme==='light'?styles.createdAt:styles.createdAt2 }>{"5 days ago"}</Text> */}
-                      <View>
-      <TouchableOpacity
-        // onPress={handleSpeechStart}
-        onPress={() => handleSpeechStart(item)}
-
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          paddingVertical: 2,
-          paddingHorizontal:5,
-          borderWidth: 1,
-          borderColor: "#9E9E9E",
-          borderRadius: 20, // Rounded edges for the button
-        }}
-      >
-        <View
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 20, // Makes the icon container circular
-            justifyContent: "center",
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#BF0000",
-            marginRight: 8, // Adds space between icon and text
-            backgroundColor:"#BF0000"
-          }}
-        >
-          <FontAwesome
-            name={isSpeaking ? "volume-off" : "volume-up"}
-            size={12}
-            color="#fff"
-          />
-        </View>
-        <Text style={{ fontSize: 14,  color:theme === 'light'? "#333":"#9E9E9E" }}>{isSpeaking ? "ऑडियो रोकें" : "ऑडियो सुनें"} </Text>
-      </TouchableOpacity>
-
-    
-    </View>
-                      <View style={styles.buttons}>
-                         
-                          <TouchableOpacity
-                              style={styles.button}
-                              onPress={() => handleRemoveItem(item)}
-                          >
-                              <FontAwesome name="bookmark" size={16} color="red" />
-                              <Text style={theme==='light'?styles.buttonText:styles.buttonText2}>सेव</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={styles.button}>
-                              <FontAwesome name="share" size={16} color={theme === 'dark' ? '#9E9E9E' : '#333'} />
-                              <Text style={theme==='light'?styles.buttonText:styles.buttonText2}>शेयर</Text>
-                          </TouchableOpacity>
-                      </View>
-                  </View>
-              </TouchableOpacity>
-          );
-      }}
-      
+                      <Text style={{ fontSize: 14, color: theme === "light" ? "#333" : "#9E9E9E" }}>
+                        ऑडियो सुनें
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                ) : (
+                  <View />
+                )}
+              </View>
+              <View style={styles.buttons}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => handleRemoveItem(item)}
+                >
+                  <FontAwesome name="bookmark" size={16} color="red" />
+                  <Text style={theme === "light" ? styles.buttonText : styles.buttonText2}>
+                    सेव
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.button}>
+                  <FontAwesome name="share" size={16} color={theme === "dark" ? "#9E9E9E" : "#333"} />
+                  <Text style={theme === "light" ? styles.buttonText : styles.buttonText2}>
+                    शेयर
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
         ListEmptyComponent={() => (
           <View
             style={{
@@ -400,16 +320,13 @@ export default function CartScreen() {
                 fontSize: 24,
                 marginTop: 20,
                 color: "#333",
-                // fontFamily: "Raleway_600SemiBold",
               }}
             >
               No News Saved!
             </Text>
           </View>
         )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
     </LinearGradient>
   );
@@ -436,15 +353,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   title: {
-    // fontSize: 16,
     textAlign: "left",
-    // fontFamily: "Raleway_600SemiBold",
   },
   title2: {
-    // fontSize: 16,
     textAlign: "left",
-    // fontFamily: "Raleway_600SemiBold",
-    color:"#fff"
+    color: "#fff",
   },
   content: {
     fontSize: 14,
@@ -481,7 +394,6 @@ const styles = StyleSheet.create({
   button: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
     padding: 4,
     borderRadius: 5,
     paddingHorizontal: 10,
@@ -508,9 +420,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   videoThumbnail: {
-    width: width * 0.35, // 35% of the screen width
-    height: undefined, // Automatically adjust height to maintain aspect ratio
-    aspectRatio: 16 / 9, // Maintain a 16:9 aspect ratio
+    width: width * 0.35,
+    height: undefined,
+    aspectRatio: 16 / 9,
     marginLeft: 10,
     borderRadius: 10,
     marginTop: 10,
