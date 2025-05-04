@@ -23,7 +23,11 @@ import { Audio, AVPlaybackStatus } from "expo-av";
 
 import { AppState, AppStateStatus } from "react-native";
 import { useAudio } from "../Audio/AudioContext";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime"; // Import relativeTime plugin
 
+// Extend dayjs with relativeTime plugin
+dayjs.extend(relativeTime);
 type NewsCardProps = {
   item: NewsType;
 };
@@ -318,6 +322,25 @@ slug:item.slug,
       router.push(`/course-details?item=${serializedItem}`);
     };
   
+
+    const formatCreatedAt = (createdAt:any) => {
+      const now = dayjs();
+      const createdDate = dayjs(createdAt); // Parse the createdAt date
+      const diffInDays = now.diff(createdDate, "day"); // Calculate difference in days
+    
+      // If the difference is 3 days or less, show relative time (e.g., "3 days ago")
+      if (diffInDays <= 3) {
+        return createdDate.fromNow(); // e.g., "3 days ago", "2 minutes ago"
+      } else {
+        // If more than 3 days, show the date in "DD MMM YYYY" format
+        return createdDate.format("DD MMM YYYY"); // e.g., "25 Oct 2023"
+      }
+    };
+  
+    // Placeholder function for getThumbnailUrl (replace with your actual implementation)
+
+
+
     return (
       <TouchableOpacity onPress={() => handlePress(item)}       style={theme === "light" ? styles.container : styles.container2}
 >
@@ -331,6 +354,14 @@ slug:item.slug,
                     >
                       {item.title}
                     </Text>
+
+                    {/* Add createdAt with clock icon */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+            <FontAwesome name="clock-o" size={14} color="#6B7280" style={{ marginRight: 4 }} />
+            <Text style={{ fontSize: 14, color: "#6B7280" }}>
+              {formatCreatedAt(item.createdAt)}
+            </Text>
+          </View>
                   </View>
           <View style={{ position: "relative" }}>
             <Image

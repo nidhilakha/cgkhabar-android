@@ -25,7 +25,11 @@ import Header from "@/components/header/header";
 import { useFocusEffect } from "expo-router";
 import { AppState, AppStateStatus } from "react-native";
 import { useAudio } from "@/components/Audio/AudioContext";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime"; // Import relativeTime plugin
 
+// Extend dayjs with relativeTime plugin
+dayjs.extend(relativeTime);
 const { width, height } = Dimensions.get("window");
 
 export default function CartScreen() {
@@ -127,6 +131,20 @@ export default function CartScreen() {
   };
   const handleStop = () => stopAudio();
 
+     const formatCreatedAt = (createdAt:any) => {
+        const now = dayjs();
+        const createdDate = dayjs(createdAt); // Parse the createdAt date
+        const diffInDays = now.diff(createdDate, "day"); // Calculate difference in days
+      
+        // If the difference is 3 days or less, show relative time (e.g., "3 days ago")
+        if (diffInDays <= 3) {
+          return createdDate.fromNow(); // e.g., "3 days ago", "2 minutes ago"
+        } else {
+          // If more than 3 days, show the date in "DD MMM YYYY" format
+          return createdDate.format("DD MMM YYYY"); // e.g., "25 Oct 2023"
+        }
+      };
+
   return (
     <LinearGradient
       colors={theme === "dark" ? ["#0C0C0C", "#0C0C0C"] : ["#F2F2F2", "#e3e3e3"]}
@@ -151,6 +169,12 @@ export default function CartScreen() {
                 >
                   {item?.title}
                 </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                            <FontAwesome name="clock-o" size={14} color="#6B7280" style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 14, color: "#6B7280" }}>
+                              {formatCreatedAt(item.createdAt)}
+                            </Text>
+                          </View>
               </View>
               <View style={{ position: "relative" }}>
                 <Image
@@ -293,7 +317,7 @@ export default function CartScreen() {
                 >
                   <FontAwesome name="bookmark" size={16} color="red" />
                   <Text style={theme === "light" ? styles.buttonText : styles.buttonText2}>
-                    सेव
+                     सेव
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.button}>
