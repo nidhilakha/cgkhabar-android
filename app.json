@@ -4,7 +4,7 @@
     "slug": "cgkhabar",
     "version": "1.0.6" , 
     "orientation": "portrait",
-    "icon": "./assets/images/app_icon.jpg",
+    "icon": "./assets/images/app_icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -21,9 +21,9 @@
       "permissions": ["INTERNET", "ACCESS_NOTIFICATION_POLICY"],
    
       "adaptiveIcon": {
-        "image": "./assets/images/app_icon.jpg"
-     
-      },
+    "foregroundImage": "./assets/images/adaptive-icon.png",
+    "backgroundColor": "#FFFFFF"
+  },
       "package": "com.cgkhabar.cgkhabarapp"
     
     },
@@ -33,7 +33,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "notification": {
-      "icon": "./assets/images/app_icon.jpg",
+      "icon": "./assets/images/app_icon.png",
       "color": "#C3F458"
     },
     "plugins": [

@@ -1,37 +1,42 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, FlatList, StyleSheet, Dimensions, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, FlatList, StyleSheet, Dimensions, Text, TouchableOpacity, Image, ActivityIndicator, ImageStyle } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import axios from 'axios';
-import { SERVER_URI } from '@/utils/uri';
-import { WebView } from 'react-native-webview';
-import YoutubePlayer from 'react-native-youtube-iframe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-const extractVideoId = (url: string) => {
-  const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
-};
+// YouTube API constants
+const PLAYLIST_ID = 'PLQbbImiJ-joM13yseXUokWwPwa0MdWQ_b';
+const YOUTUBE_API_KEY = 'AIzaSyCik17R9boBQygpq4JJLjVcjFbKsfYSvwQ';
+const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/playlistItems';
+
+// Type for YouTube video data
+interface NewsType {
+  _id: string; // Use videoId as _id for compatibility
+  title: string;
+  reel_url: string; // YouTube video URL
+  content?: string; // Optional: description or other metadata
+  slug?: string; // Optional: for routing
+  thumbnail?: string; // Thumbnail URL
+}
 
 const NewsScreen = () => {
   const [newsItems, setNewsItems] = useState<NewsType[]>([]);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [viewableItems, setViewableItems] = useState<number[]>([]);
-  const flatListRef = useRef<FlatList<NewsType>>(null);
-  const [loadingStates, setLoadingStates] = useState<boolean[]>([]);
-  const [theme, setTheme] = useState("light");
-  const [largeFontSize, setLargeFontSize] = useState("default");
+  const [theme, setTheme] = useState('light');
+  const [largeFontSize, setLargeFontSize] = useState('default');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       const fetchFont = async () => {
         try {
-          const storedFont = await AsyncStorage.getItem("largeFontSize");
+          const storedFont = await AsyncStorage.getItem('largeFontSize');
           if (storedFont) setLargeFontSize(storedFont);
         } catch (error) {
-          console.error("Error fetching font size:", error);
+          console.error('Error fetching font size:', error);
         }
       };
       fetchFont();
@@ -41,167 +46,236 @@ const NewsScreen = () => {
   useFocusEffect(
     useCallback(() => {
       const fetchTheme = async () => {
-        const storedTheme = await AsyncStorage.getItem("theme");
-        setTheme(storedTheme || "light");
+        const storedTheme = await AsyncStorage.getItem('theme');
+        setTheme(storedTheme || 'light');
       };
       fetchTheme();
     }, [])
   );
 
+  // Fetch YouTube playlist videos
+// Fetch YouTube playlist videos
   useEffect(() => {
-    axios
-      .get(`${SERVER_URI}/shorts`)
-      .then((res) => {
-        setNewsItems(res.data.news);
-        setLoadingStates(new Array(res.data.news.length).fill(false));
-      })
-      .catch((error) => {
-        console.error("Error fetching news:", error);
-      });
+    const fetchYouTubeVideos = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(YOUTUBE_API_URL, {
+          params: {
+            part: 'snippet',
+            playlistId: PLAYLIST_ID,
+            key: YOUTUBE_API_KEY,
+            maxResults: 50,
+          },
+        });
+
+
+        // Map and filter YouTube API response to include only public videos
+        const videos: NewsType[] = response.data.items
+          .filter((item: any) => {
+            const title = item.snippet.title.toLowerCase();
+            return !title.includes('private video') && !title.includes('deleted video');
+          })
+          .map((item: any) => ({
+            _id: item.snippet.resourceId.videoId,
+            title: item.snippet.title,
+            reel_url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
+            content: item.snippet.description || '',
+            slug: item.snippet.resourceId.videoId,
+            thumbnail: item.snippet.thumbnails?.medium?.url || 'https://via.placeholder.com/120x80',
+          }));
+
+        setNewsItems(videos);
+
+        if (videos.length === 0) {
+          setError('No public videos found in the playlist.');
+        }
+      } catch (error: any) {
+        console.error('Error fetching YouTube videos:', error);
+        if (error.response) {
+          if (error.response.status === 403) {
+            setError('API quota exceeded or invalid API key.');
+          } else if (error.response.status === 400) {
+            setError('Invalid playlist ID or request parameters.');
+          } else {
+            setError('Failed to fetch videos: ' + error.response.data.error.message);
+          }
+        } else {
+          setError('Network error or no internet connection.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchYouTubeVideos();
   }, []);
 
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
-    if (viewableItems.length > 0) {
-      const visibleIndices = viewableItems.map((item) => item.index);
-      setCurrentIndex(visibleIndices[0]);
-      setViewableItems(visibleIndices);
-    }
-  }, []);
-
-  const viewabilityConfig = {
-    itemVisiblePercentThreshold: 20,
-  };
-
-  const renderItem = ({ item, index }: { item: any; index: number }) => {
-    const videoId = item.reel_url ? extractVideoId(item.reel_url) : null;
-    const isItemVisible = viewableItems.includes(index);
-    const videoUrlWithMute = item.reel_url
-      ? `${item.reel_url}?autoplay=1&mute=0&playsinline=1&controls=0`
-      : null;
-
+  const renderItem = ({ item }: { item: NewsType }) => {
     const handlePress = () => {
       const simplifiedItem = {
         id: item._id,
         title: item.title,
         content: item.content,
-        featured_video: item.featured_video,
-        yt_url: item.yt_url,
         reel_url: item.reel_url,
-        slug:item.slug,
+        slug: item.slug,
+        thumbnail: item.thumbnail,
       };
       const serializedItem = encodeURIComponent(JSON.stringify(simplifiedItem));
-      router.push(`/course-details?item=${serializedItem}`);
+      router.push(`/(routes)/video-player?item=${serializedItem}` as any);
+      // Type-safe alternative:
+      // router.push({
+      //   pathname: '/(routes)/video-player',
+      //   params: { item: serializedItem },
+      // });
     };
 
     return (
-      <View style={[styles.container, { backgroundColor: theme === "dark" ? "#0C0C0C" : "#e3e3e3" }]}>
-        {videoId && isItemVisible ? (
-          <WebView
-            style={{ width, height, backgroundColor: "black" }}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            allowsInlineMediaPlayback={true}
-            mediaPlaybackRequiresUserAction={false}
-            source={{ uri: videoUrlWithMute || "" }}
-            startInLoadingState={false}
+      <TouchableOpacity
+        style={[styles.itemContainer, { backgroundColor: theme === 'dark' ? '#1C1C1C' : '#FFFFFF' }]}
+        onPress={handlePress}
+      >
+        <View style={styles.thumbnailContainer}>
+          <Image
+            source={{ uri: item.thumbnail }}
+            style={styles.thumbnail as ImageStyle}
+            resizeMode="cover"
           />
-        ) : (
-          <View style={styles.noVideoContainer}>
-            <Text style={styles.noVideoText}>No Videos Available</Text>
-          </View>
-        )}
-
-        <View style={styles.overlay}>
-          <TouchableOpacity style={styles.readMoreButton} onPress={handlePress}>
-            <Text style={styles.readMoreText}>Read More</Text>
-          </TouchableOpacity>
+          <FontAwesome
+            name="youtube-play"
+            size={25}
+            color="red"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: [{ translateX: -15 }, { translateY: -15 }],
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              borderRadius: 50,
+              padding: 8,
+            }}
+          />
         </View>
-      </View>
+        <View style={styles.textContainer}>
+          <Text
+            style={[
+              styles.title,
+              { color: theme === 'dark' ? '#FFFFFF' : '#000000' },
+              largeFontSize === 'large' ? styles.largeFont : styles.defaultFont,
+            ]}
+            numberOfLines={2}
+          >
+            {item.title}
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
   return (
-    <FlatList
-      ref={flatListRef}
-      data={newsItems}
-      renderItem={renderItem}
-      keyExtractor={(item) => item._id}
-      pagingEnabled
-      showsVerticalScrollIndicator={false}
-      snapToAlignment="start"
-      decelerationRate="fast"
-      snapToInterval={height}
-      onViewableItemsChanged={onViewableItemsChanged}
-      viewabilityConfig={viewabilityConfig}
-      getItemLayout={(data, index) => ({ length: height, offset: height * index, index })}
-      contentContainerStyle={{
-        flexGrow: 1,
-        backgroundColor: theme === "dark" ? "#0C0C0C" : "#e3e3e3",
-      }}
-      ListEmptyComponent={
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No Videos Available</Text>
+    <View style={[styles.container, { backgroundColor: theme === 'dark' ? '#0C0C0C' : '#e3e3e3' }]}>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme === 'dark' ? '#FFFFFF' : '#000000'} />
+          <Text style={[styles.loadingText, { color: theme === 'dark' ? '#FFFFFF' : '#000000' }]}>
+            Loading videos...
+          </Text>
         </View>
-      }
-    />
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={newsItems}
+          renderItem={renderItem}
+          keyExtractor={(item) => item._id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No Videos Available</Text>
+            </View>
+          }
+        />
+      )}
+    </View>
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
-    width,
-    height,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 15,
-  },
-  noVideoContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+
   },
-  noVideoText: {
-    color: "#999",
+  listContent: {
+    padding: 10,
+            paddingTop:50,
+            paddingBottom:50,
+
+  },
+  itemContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    borderRadius: 8,
+    padding: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  thumbnailContainer: {
+    position: 'relative',
+  },
+  thumbnail: {
+    width: 120,
+    height: 80,
+    borderRadius: 8,
+  },
+  textContainer: {
+    flex: 1,
+    paddingLeft: 10,
+    justifyContent: 'center',
+  },
+  title: {
+    fontWeight: '600',
+  },
+  defaultFont: {
     fontSize: 16,
+  },
+  largeFont: {
+    fontSize: 20,
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   emptyText: {
     fontSize: 18,
-    color: "#999",
+    color: '#999',
   },
-  overlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 20, // Position it towards the bottom
-    alignItems: 'flex-start', // Align items to the start
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  readMoreButton: {
-    position: 'absolute',
-    top: 24, // Position 20px from the top
-    right: 16, // Position 20px from the right
-    paddingVertical: 2,
-    paddingHorizontal: 5,
-    borderWidth: 1,
-    borderColor: '#fff',
-    borderRadius: 5,
-    backgroundColor: 'transparent',
+  loadingText: {
+    fontSize: 16,
+    marginTop: 10,
   },
-  readMoreText: {
-    color: 'white',
-    fontSize: 14,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   errorText: {
-    color: 'red',
-    fontSize: 16,
-    marginTop: 20,
+    fontSize: 18,
+    color: '#FF0000',
+    textAlign: 'center',
   },
 });
 

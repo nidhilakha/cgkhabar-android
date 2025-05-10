@@ -19,7 +19,7 @@ export {
   ErrorBoundary,
 } from "expo-router";
 
-// SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync();
 
 type NotificationData = {
   _id: string;
@@ -354,7 +354,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(routes)/login/index" />
         <Stack.Screen name="(routes)/sign-up/index" />
         <Stack.Screen name="(routes)/forgot-password/index" />
-
+<Stack.Screen name="(routes)/video-player/index" options={{ title: 'Video Player' }} />
         <Stack.Screen
   name="(routes)/course-details/index"
   options={{
